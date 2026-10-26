@@ -220,6 +220,16 @@ func (c *Client) WritePump() {
 // dispatch routes incoming envelopes to the hub or room handler.
 func (c *Client) dispatch(env protocol.Envelope) {
 	switch env.Type {
+	case protocol.MsgTypeChangeRoomMode:
+		r := c.CurrentRoom()
+		if r != nil && r.HostID() == c.ID {
+			var p struct {
+				RoomMode string `json:"room_mode"`
+			}
+			if err := json.Unmarshal(env.Payload, &p); err == nil {
+				r.SetMode(p.RoomMode)
+			}
+		}
 	case protocol.MsgTypePing:
 		var pingTimestamp int64
 		_ = json.Unmarshal(env.Payload, &pingTimestamp)

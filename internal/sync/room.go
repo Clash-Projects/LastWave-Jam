@@ -184,6 +184,7 @@ func (r *Room) Leave(c *Client) {
 	r.Broadcast(protocol.MsgTypeUserLeft, map[string]any{
 		"user_id":     c.ID,
 		"name":        userName,
+		"is_host":     false,
 		"total_users": totalUsers,
 	})
 
@@ -192,6 +193,9 @@ func (r *Room) Leave(c *Client) {
 		r.Broadcast(protocol.MsgTypeHostChanged, map[string]any{
 			"new_host_id":   newHost.ID,
 			"new_host_name": newHost.Name(),
+			"user_id":       newHost.ID,
+			"name":          newHost.Name(),
+			"is_host":       true,
 		})
 	}
 }
@@ -408,4 +412,18 @@ func (r *Room) HandleRejectSuggestion(c *Client, suggestionID string) {
 		return
 	}
 	delete(r.pendingSuggestions, suggestionID)
+}
+
+// SetMode updates the room mode (host_only or collaborative) and broadcasts the change.
+func (r *Room) SetMode(mode string) {
+	if mode != protocol.RoomModeCollaborative {
+		mode = protocol.RoomModeHostOnly
+	}
+	r.mu.Lock()
+	r.Mode = mode
+	r.mu.Unlock()
+
+	r.Broadcast(protocol.MsgTypeRoomModeChanged, map[string]any{
+		"room_mode": mode,
+	})
 }

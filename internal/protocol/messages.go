@@ -13,6 +13,7 @@ const (
 	MsgTypeSuggestTrack      = "suggest_track"
 	MsgTypeApproveSuggestion = "approve_suggestion"
 	MsgTypeRejectSuggestion  = "reject_suggestion"
+	MsgTypeChangeRoomMode    = "change_room_mode"
 	MsgTypePing              = "ping"
 
 	// Server -> Client
@@ -23,6 +24,7 @@ const (
 	MsgTypeChatMessage        = "chat_message"
 	MsgTypeSyncPlayback       = "sync_playback"
 	MsgTypeHostChanged        = "host_changed"
+	MsgTypeRoomModeChanged    = "room_mode_changed"
 	MsgTypeSuggestionReceived = "suggestion_received"
 	MsgTypePong               = "pong"
 	MsgTypeError              = "error"

@@ -4,9 +4,9 @@
 *.dll
 *.so
 *.dylib
-lastwave-jam
-server
-bin/
+/lastwave-jam
+/server
+/bin/
 
 # Test binary, built with `go test -c`
 *.test

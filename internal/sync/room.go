@@ -13,13 +13,13 @@ type Room struct {
 	Mode      string
 	CreatedAt time.Time
 
-	mu                  sync.RWMutex
-	host                *Client
-	participants        map[string]*Client
-	joinedOrder         []string
-	state               protocol.PlaybackState
-	chat                *ChatBuffer
-	pendingSuggestions  map[string]*protocol.SuggestionReceivedPayload
+	mu                 sync.RWMutex
+	host               *Client
+	participants       map[string]*Client
+	joinedOrder        []string
+	state              protocol.PlaybackState
+	chat               *ChatBuffer
+	pendingSuggestions map[string]*protocol.SuggestionReceivedPayload
 }
 
 // NewRoom creates a new listening room with the specified host and mode.
@@ -280,9 +280,13 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 	case protocol.ActionChangeTrack:
 		if p.Track != nil && protocol.SanitizeTrack(p.Track) {
 			r.state.CurrentTrack = p.Track
-			r.state.PositionMs = 0
+			if p.PositionMs > 0 {
+				r.state.PositionMs = p.PositionMs
+			} else {
+				r.state.PositionMs = 0
+			}
 			r.state.ServerTimeMs = nowMs
-			r.state.IsPlaying = true
+			r.state.IsPlaying = p.IsPlaying
 		}
 
 	case protocol.ActionQueueAdd:
@@ -317,8 +321,13 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 
 	r.state.Revision++
 
+	var fromID string
+	if c != nil {
+		fromID = c.ID
+	}
 	broadcastPayload := protocol.PlaybackActionPayload{
 		Action:       p.Action,
+		FromUserID:   fromID,
 		Track:        r.state.CurrentTrack,
 		PositionMs:   r.state.PositionMs,
 		ServerTimeMs: r.state.ServerTimeMs,

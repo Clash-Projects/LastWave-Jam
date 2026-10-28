@@ -53,7 +53,7 @@ func SanitizeChatText(raw string) (string, error) {
 	return trimmed, nil
 }
 
-// SanitizeTrack validates that a track has both an ID and a Title.
+// SanitizeTrack validates that a track has a Title, falling back to Title as ID if missing.
 func SanitizeTrack(track *TrackInfo) bool {
 	if track == nil {
 		return false
@@ -61,5 +61,11 @@ func SanitizeTrack(track *TrackInfo) bool {
 	track.ID = strings.TrimSpace(track.ID)
 	track.Title = strings.TrimSpace(track.Title)
 	track.Artist = strings.TrimSpace(track.Artist)
-	return track.ID != "" && track.Title != ""
+	if track.Title == "" {
+		return false
+	}
+	if track.ID == "" {
+		track.ID = track.Title
+	}
+	return true
 }

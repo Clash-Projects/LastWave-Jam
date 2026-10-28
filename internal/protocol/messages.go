@@ -96,14 +96,15 @@ type TrackInfo struct {
 
 // PlaybackActionPayload communicates playback commands and state broadcasts.
 type PlaybackActionPayload struct {
-	Action       string     `json:"action"`
-	Track        *TrackInfo `json:"track,omitempty"`
-	PositionMs   int64      `json:"position_ms"`
-	ClientTimeMs int64      `json:"client_time_ms,omitempty"`
-	ServerTimeMs int64      `json:"server_time_ms"`
-	IsPlaying    bool       `json:"is_playing"`
+	Action       string      `json:"action"`
+	FromUserID   string      `json:"from_user_id,omitempty"`
+	Track        *TrackInfo  `json:"track,omitempty"`
+	PositionMs   int64       `json:"position_ms"`
+	ClientTimeMs int64       `json:"client_time_ms,omitempty"`
+	ServerTimeMs int64       `json:"server_time_ms"`
+	IsPlaying    bool        `json:"is_playing"`
 	Queue        []TrackInfo `json:"queue,omitempty"`
-	Revision     int64      `json:"revision"`
+	Revision     int64       `json:"revision"`
 }
 
 // PlaybackState encapsulates the room's current synchronized playback timeline.

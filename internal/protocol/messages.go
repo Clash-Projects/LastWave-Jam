@@ -92,6 +92,7 @@ type TrackInfo struct {
 	DurationMs  int64  `json:"duration_ms,omitempty"`
 	Source      string `json:"source,omitempty"`
 	SuggestedBy string `json:"suggested_by,omitempty"`
+	IsAutoDJ    bool   `json:"is_autodj,omitempty"`
 }
 
 // PlaybackActionPayload communicates playback commands and state broadcasts.
@@ -103,6 +104,7 @@ type PlaybackActionPayload struct {
 	ClientTimeMs int64       `json:"client_time_ms,omitempty"`
 	ServerTimeMs int64       `json:"server_time_ms"`
 	IsPlaying    bool        `json:"is_playing"`
+	IsAutoDJ     bool        `json:"is_autodj,omitempty"`
 	Queue        []TrackInfo `json:"queue,omitempty"`
 	Revision     int64       `json:"revision"`
 }
@@ -113,6 +115,7 @@ type PlaybackState struct {
 	PositionMs   int64       `json:"position_ms"`
 	ServerTimeMs int64       `json:"server_time_ms"`
 	IsPlaying    bool        `json:"is_playing"`
+	IsAutoDJ     bool        `json:"is_autodj,omitempty"`
 	Queue        []TrackInfo `json:"queue"`
 	Revision     int64       `json:"revision"`
 }

@@ -287,6 +287,7 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 			}
 			r.state.ServerTimeMs = nowMs
 			r.state.IsPlaying = p.IsPlaying
+			r.state.IsAutoDJ = p.IsAutoDJ || p.Track.IsAutoDJ || p.Track.Source == "autodj"
 		}
 
 	case protocol.ActionQueueAdd:
@@ -332,6 +333,7 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 		PositionMs:   r.state.PositionMs,
 		ServerTimeMs: r.state.ServerTimeMs,
 		IsPlaying:    r.state.IsPlaying,
+		IsAutoDJ:     r.state.IsAutoDJ || p.IsAutoDJ || (p.Track != nil && (p.Track.IsAutoDJ || p.Track.Source == "autodj")),
 		Queue:        append([]protocol.TrackInfo(nil), r.state.Queue...),
 		Revision:     r.state.Revision,
 	}

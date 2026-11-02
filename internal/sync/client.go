@@ -90,19 +90,27 @@ func (c *Client) Send(msgType string, payload any) error {
 		return ErrConnectionClosed
 	}
 
+	msgBytes, err := encodeEnvelope(msgType, payload)
+	if err != nil {
+		return err
+	}
+	return c.sendRaw(msgBytes)
+}
+
+// encodeEnvelope serializes a typed message once so a broadcast to N clients
+// costs one JSON encode instead of N.
+func encodeEnvelope(msgType string, payload any) ([]byte, error) {
 	rawPayload, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return json.Marshal(protocol.Envelope{Type: msgType, Payload: rawPayload})
+}
 
-	env := protocol.Envelope{
-		Type:    msgType,
-		Payload: rawPayload,
-	}
-
-	msgBytes, err := json.Marshal(env)
-	if err != nil {
-		return err
+// sendRaw queues pre-encoded bytes; slow clients drop messages, never block.
+func (c *Client) sendRaw(msgBytes []byte) error {
+	if c.closed.Load() {
+		return ErrConnectionClosed
 	}
 
 	c.mu.RLock()
@@ -151,6 +159,7 @@ func (c *Client) ReadPump() {
 		c.Close()
 	}()
 
+	limiter := newMsgLimiter()
 	c.conn.SetReadLimit(maxMessageSize)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
@@ -165,6 +174,14 @@ func (c *Client) ReadPump() {
 				slog.Debug("websocket read error", "user_id", c.ID, "err", err)
 			}
 			break
+		}
+
+		if !limiter.allow(time.Now()) {
+			if limiter.strikes++; limiter.strikes > maxFloodStrikes {
+				slog.Warn("closing flooding client", "user_id", c.ID)
+				break
+			}
+			continue
 		}
 
 		var env protocol.Envelope
@@ -222,7 +239,7 @@ func (c *Client) dispatch(env protocol.Envelope) {
 	switch env.Type {
 	case protocol.MsgTypeChangeRoomMode:
 		r := c.CurrentRoom()
-		if r != nil && r.HostID() == c.ID {
+		if r != nil && r.IsHost(c) {
 			var p struct {
 				RoomMode string `json:"room_mode"`
 			}
@@ -230,6 +247,36 @@ func (c *Client) dispatch(env protocol.Envelope) {
 				r.SetMode(p.RoomMode)
 			}
 		}
+	case protocol.MsgTypeQueueUpdate:
+		r := c.CurrentRoom()
+		if r == nil {
+			c.SendError("not_in_room", "You must be in a room to share a queue")
+			return
+		}
+		var p protocol.QueueUpdatePayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			c.SendError("invalid_payload", "Invalid queue_update payload")
+			return
+		}
+		r.HandleQueueUpdate(c, p.Queue)
+
+	case protocol.MsgTypeGrantHost, protocol.MsgTypeRevokeHost:
+		r := c.CurrentRoom()
+		if r == nil {
+			c.SendError("not_in_room", "You must be in a room to manage hosts")
+			return
+		}
+		var p protocol.GrantHostPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			c.SendError("invalid_payload", "Invalid host payload")
+			return
+		}
+		if env.Type == protocol.MsgTypeGrantHost {
+			r.GrantCoHost(c, p.UserID)
+		} else {
+			r.RevokeCoHost(c, p.UserID)
+		}
+
 	case protocol.MsgTypePing:
 		var pingTimestamp int64
 		_ = json.Unmarshal(env.Payload, &pingTimestamp)
@@ -274,7 +321,7 @@ func (c *Client) dispatch(env protocol.Envelope) {
 			c.SendError("invalid_payload", "Invalid send_chat payload")
 			return
 		}
-		r.HandleChat(c, p.Text)
+		r.HandleChat(c, p.Text, p.ReplyToID)
 
 	case protocol.MsgTypePlaybackAction:
 		r := c.CurrentRoom()
@@ -331,4 +378,34 @@ func (c *Client) dispatch(env protocol.Envelope) {
 	default:
 		c.SendError("unknown_message_type", "Unknown message type: "+env.Type)
 	}
+}
+
+const (
+	msgRatePerSec   = 10.0 // sustained inbound messages per second per client
+	msgBurst        = 30.0
+	maxFloodStrikes = 200 // dropped messages tolerated before disconnecting
+)
+
+// msgLimiter is a tiny token bucket guarding against inbound floods.
+type msgLimiter struct {
+	tokens  float64
+	last    time.Time
+	strikes int
+}
+
+func newMsgLimiter() *msgLimiter {
+	return &msgLimiter{tokens: msgBurst, last: time.Now()}
+}
+
+func (l *msgLimiter) allow(now time.Time) bool {
+	l.tokens += now.Sub(l.last).Seconds() * msgRatePerSec
+	if l.tokens > msgBurst {
+		l.tokens = msgBurst
+	}
+	l.last = now
+	if l.tokens < 1 {
+		return false
+	}
+	l.tokens--
+	return true
 }

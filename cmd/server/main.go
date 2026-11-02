@@ -33,6 +33,7 @@ func main() {
 	slog.Info("initializing LastWave Sync Server", "port", port)
 
 	hub := sync.NewHub()
+	hub.EnsurePermanentRooms()
 	srv := server.NewServer(server.Config{
 		Port:            port,
 		CleanupInterval: 2 * time.Minute,

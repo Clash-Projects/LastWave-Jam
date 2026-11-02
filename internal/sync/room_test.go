@@ -138,7 +138,7 @@ func TestRoom_ChatBroadcast(t *testing.T) {
 	_ = readLastEnvelope(t, guest)
 
 	// Sarah sends a chat message
-	room.HandleChat(guest, "Hello everyone!")
+	room.HandleChat(guest, "Hello everyone!", "")
 
 	hostEnv := readLastEnvelope(t, host)
 	if hostEnv == nil || hostEnv.Type != protocol.MsgTypeChatMessage {

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -12,9 +13,17 @@ type Room struct {
 	Code      string
 	Mode      string
 	CreatedAt time.Time
+	// Permanent rooms (INDIA, WORLD) are never removed from the hub and apply
+	// the per-user command cooldown.
+	Permanent bool
+	// Name is the friendly title of a public room ("India"); empty otherwise.
+	Name string
 
 	mu                 sync.RWMutex
 	host               *Client
+	coHost             *Client // at most one co-host, granted by the host
+	cooldowns          map[string]time.Time
+	now                func() time.Time
 	participants       map[string]*Client
 	joinedOrder        []string
 	state              protocol.PlaybackState
@@ -37,6 +46,8 @@ func NewRoom(code string, host *Client, mode string) *Room {
 		joinedOrder:        make([]string, 0),
 		chat:               NewChatBuffer(DefaultChatHistoryLimit),
 		pendingSuggestions: make(map[string]*protocol.SuggestionReceivedPayload),
+		cooldowns:          make(map[string]time.Time),
+		now:                time.Now,
 		state: protocol.PlaybackState{
 			Queue:        make([]protocol.TrackInfo, 0),
 			ServerTimeMs: time.Now().UnixMilli(),
@@ -60,6 +71,47 @@ func (r *Room) HostID() string {
 		return r.host.ID
 	}
 	return ""
+}
+
+const (
+	maxQueueLen           = protocol.MaxSharedQueue * 10 // collaborative queue_add bound
+	maxPendingSuggestions = 20
+	maxRoomParticipants   = 1000
+)
+
+// CoHostID returns the user ID of the co-host, or "" if there is none.
+func (r *Room) CoHostID() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.coHost != nil {
+		return r.coHost.ID
+	}
+	return ""
+}
+
+// IsHost reports whether the client is the host or the co-host.
+func (r *Room) IsHost(c *Client) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.isHostLocked(c)
+}
+
+func (r *Room) isHostLocked(c *Client) bool {
+	if c == nil {
+		return false
+	}
+	return (r.host != nil && r.host.ID == c.ID) || (r.coHost != nil && r.coHost.ID == c.ID)
+}
+
+func (r *Room) hostIDsLocked() (string, string) {
+	var h, co string
+	if r.host != nil {
+		h = r.host.ID
+	}
+	if r.coHost != nil {
+		co = r.coHost.ID
+	}
+	return h, co
 }
 
 // IsEmpty returns true if there are no participants remaining.
@@ -89,6 +141,19 @@ func (r *Room) Join(c *Client, rawName string) error {
 		return err
 	}
 
+	if r.Permanent && IsDefaultName(name) {
+		c.SendError("default_name", "Pick your own display name to join this public room")
+		return errors.New("default display name not allowed in public room")
+	}
+
+	r.mu.RLock()
+	full := len(r.participants) >= maxRoomParticipants
+	r.mu.RUnlock()
+	if full {
+		c.SendError("room_full", "This room is full, try again in a bit")
+		return errors.New("room full")
+	}
+
 	c.SetName(name)
 	c.SetRoom(r)
 
@@ -101,7 +166,8 @@ func (r *Room) Join(c *Client, rawName string) error {
 		r.host = c
 	}
 
-	isHost := (r.host != nil && r.host.ID == c.ID)
+	isHost := r.isHostLocked(c)
+	hostID, coHostID := r.hostIDsLocked()
 
 	// Prepare participants snapshot
 	participants := make([]protocol.Participant, 0, len(r.participants))
@@ -109,7 +175,8 @@ func (r *Room) Join(c *Client, rawName string) error {
 		participants = append(participants, protocol.Participant{
 			UserID:   p.ID,
 			Name:     p.Name(),
-			IsHost:   (r.host != nil && r.host.ID == p.ID),
+			IsHost:   r.isHostLocked(p),
+			IsCoHost: coHostID != "" && coHostID == p.ID,
 			JoinedAt: time.Now().UnixMilli(),
 		})
 	}
@@ -128,6 +195,10 @@ func (r *Room) Join(c *Client, rawName string) error {
 		UserID:       c.ID,
 		Name:         name,
 		IsHost:       isHost,
+		HostID:       hostID,
+		CoHostID:     coHostID,
+		Permanent:    r.Permanent,
+		RoomName:     r.Name,
 		RoomMode:     r.Mode,
 		Playback:     playbackSnapshot,
 		Participants: participants,
@@ -164,20 +235,43 @@ func (r *Room) Leave(c *Client) {
 		}
 	}
 
+	delete(r.cooldowns, c.ID)
+
 	var newHost *Client
+	coHostCleared := false
+	queueCleared := false
+	if r.coHost != nil && r.coHost.ID == c.ID {
+		r.coHost = nil
+		coHostCleared = true
+	}
 	if r.host != nil && r.host.ID == c.ID {
-		// Promote next oldest participant
-		if len(r.joinedOrder) > 0 {
-			newHostID := r.joinedOrder[0]
-			newHost = r.participants[newHostID]
-			r.host = newHost
-		} else {
-			r.host = nil
+		switch {
+		case r.coHost != nil:
+			// The co-host takes over as the main host.
+			newHost = r.coHost
+			r.coHost = nil
+			coHostCleared = true
+		case len(r.joinedOrder) > 0 && r.Permanent:
+			// Always-active rooms: the most recent joiner becomes admin.
+			newHost = r.participants[r.joinedOrder[len(r.joinedOrder)-1]]
+		case len(r.joinedOrder) > 0:
+			// Normal rooms: the longest-tenured member becomes host.
+			newHost = r.participants[r.joinedOrder[0]]
 		}
+		r.host = newHost
+		// The queue belonged to the previous admin; the new admin republishes.
+		r.state.Queue = make([]protocol.TrackInfo, 0)
+		r.state.Revision++
+		queueCleared = true
+	}
+
+	if len(r.participants) == 0 && r.Permanent {
+		r.resetLocked()
 	}
 
 	totalUsers := len(r.participants)
 	userName := c.Name()
+	hostID, coHostID := r.hostIDsLocked()
 	r.mu.Unlock()
 
 	// Notify room that user left
@@ -196,8 +290,30 @@ func (r *Room) Leave(c *Client) {
 			"user_id":       newHost.ID,
 			"name":          newHost.Name(),
 			"is_host":       true,
+			"host_id":       hostID,
+			"cohost_id":     coHostID,
+		})
+		if queueCleared {
+			r.Broadcast(protocol.MsgTypeQueueUpdated, map[string]any{"queue": []protocol.TrackInfo{}, "host_id": hostID})
+		}
+	} else if coHostCleared {
+		r.Broadcast(protocol.MsgTypeCoHostChanged, map[string]any{
+			"host_id":   hostID,
+			"cohost_id": coHostID,
 		})
 	}
+}
+
+// resetLocked clears playback, queue and suggestions. Used when an
+// always-active room empties so the next visitor starts fresh.
+func (r *Room) resetLocked() {
+	r.state = protocol.PlaybackState{
+		Queue:        make([]protocol.TrackInfo, 0),
+		ServerTimeMs: r.now().UnixMilli(),
+		Revision:     r.state.Revision + 1,
+	}
+	r.pendingSuggestions = make(map[string]*protocol.SuggestionReceivedPayload)
+	r.cooldowns = make(map[string]time.Time)
 }
 
 // Broadcast sends a message to all connected participants in the room,
@@ -219,13 +335,17 @@ func (r *Room) Broadcast(msgType string, payload any, excludeIDs ...string) {
 	}
 	r.mu.RUnlock()
 
+	msg, err := encodeEnvelope(msgType, payload)
+	if err != nil {
+		return
+	}
 	for _, c := range clients {
-		_ = c.Send(msgType, payload)
+		_ = c.sendRaw(msg)
 	}
 }
 
 // HandleChat processes and broadcasts an incoming in-room chat message.
-func (r *Room) HandleChat(c *Client, rawText string) {
+func (r *Room) HandleChat(c *Client, rawText string, replyToID string) {
 	text, err := protocol.SanitizeChatText(rawText)
 	if err != nil {
 		c.SendError("invalid_chat", err.Error())
@@ -233,7 +353,7 @@ func (r *Room) HandleChat(c *Client, rawText string) {
 	}
 
 	r.mu.RLock()
-	isHost := (r.host != nil && r.host.ID == c.ID)
+	isHost := r.isHostLocked(c)
 	r.mu.RUnlock()
 
 	msg := protocol.ChatMessage{
@@ -245,6 +365,21 @@ func (r *Room) HandleChat(c *Client, rawText string) {
 		Timestamp: time.Now().UnixMilli(),
 	}
 
+	if replyToID != "" {
+		if orig, ok := r.chat.Get(replyToID); ok {
+			quoted := orig.Text
+			if runes := []rune(quoted); len(runes) > 120 {
+				quoted = string(runes[:120]) + "…"
+			}
+			msg.ReplyTo = &protocol.ChatReply{
+				ID:       orig.ID,
+				UserID:   orig.UserID,
+				UserName: orig.UserName,
+				Text:     quoted,
+			}
+		}
+	}
+
 	r.chat.Add(msg)
 	r.Broadcast(protocol.MsgTypeChatMessage, msg)
 }
@@ -254,10 +389,22 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	isHost := (r.host != nil && r.host.ID == c.ID)
+	isHost := r.isHostLocked(c)
 	if r.Mode == protocol.RoomModeHostOnly && !isHost {
 		c.SendError("unauthorized", "Only the host can control playback in host-only mode")
 		return
+	}
+
+	if r.Permanent && isCooldownAction(p.Action) {
+		if wait := r.cooldownRemainingLocked(c.ID); wait > 0 {
+			r.rejectRateLimitedLocked(c, wait)
+			return
+		}
+		r.cooldowns[c.ID] = r.now()
+		_ = c.Send(protocol.MsgTypeCooldown, map[string]any{
+			"retry_at_ms": r.now().Add(CooldownWindow).UnixMilli(),
+			"window_ms":   CooldownWindow.Milliseconds(),
+		})
 	}
 
 	nowMs := time.Now().UnixMilli()
@@ -291,7 +438,7 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 		}
 
 	case protocol.ActionQueueAdd:
-		if p.Track != nil && protocol.SanitizeTrack(p.Track) {
+		if p.Track != nil && protocol.SanitizeTrack(p.Track) && len(r.state.Queue) < maxQueueLen {
 			r.state.Queue = append(r.state.Queue, *p.Track)
 		}
 
@@ -346,8 +493,10 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 		}
 	}
 
-	for _, client := range clients {
-		_ = client.Send(protocol.MsgTypeSyncPlayback, broadcastPayload)
+	if msg, err := encodeEnvelope(protocol.MsgTypeSyncPlayback, broadcastPayload); err == nil {
+		for _, client := range clients {
+			_ = client.sendRaw(msg)
+		}
 	}
 }
 
@@ -359,8 +508,14 @@ func (r *Room) HandleSuggestTrack(c *Client, track *protocol.TrackInfo) {
 	}
 
 	r.mu.Lock()
-	if r.host == nil || r.host.ID == c.ID {
+	if r.host == nil || r.isHostLocked(c) {
 		r.mu.Unlock()
+		return
+	}
+
+	if len(r.pendingSuggestions) >= maxPendingSuggestions {
+		r.mu.Unlock()
+		c.SendError("too_many_suggestions", "The host has too many pending suggestions")
 		return
 	}
 
@@ -384,7 +539,7 @@ func (r *Room) HandleSuggestTrack(c *Client, track *protocol.TrackInfo) {
 // HandleApproveSuggestion allows the host to approve a suggested track into the queue.
 func (r *Room) HandleApproveSuggestion(c *Client, suggestionID string) {
 	r.mu.Lock()
-	if r.host == nil || r.host.ID == c.ID {
+	if r.host == nil || r.isHostLocked(c) {
 		sug, exists := r.pendingSuggestions[suggestionID]
 		if !exists || sug == nil {
 			r.mu.Unlock()
@@ -418,7 +573,7 @@ func (r *Room) HandleApproveSuggestion(c *Client, suggestionID string) {
 func (r *Room) HandleRejectSuggestion(c *Client, suggestionID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.host == nil || r.host.ID != c.ID {
+	if !r.isHostLocked(c) {
 		c.SendError("unauthorized", "Only the host can reject suggestions")
 		return
 	}

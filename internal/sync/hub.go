@@ -33,6 +33,49 @@ func NewHub() *Hub {
 	}
 }
 
+// PermanentRooms are the always-active rooms every server provides.
+var PermanentRooms = []struct{ Code, Name string }{
+	{"INDIA", "India"},
+	{"WORLD", "International"},
+}
+
+// RoomInfo is the public summary of an always-active room.
+type RoomInfo struct {
+	Code         string `json:"code"`
+	Name         string `json:"name"`
+	Participants int    `json:"participants"`
+}
+
+// PublicRooms lists the always-active rooms with live listener counts.
+func (h *Hub) PublicRooms() []RoomInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := make([]RoomInfo, 0, len(PermanentRooms))
+	for _, pr := range PermanentRooms {
+		if room, ok := h.rooms[pr.Code]; ok {
+			out = append(out, RoomInfo{Code: pr.Code, Name: pr.Name, Participants: room.ParticipantCount()})
+		}
+	}
+	return out
+}
+
+// EnsurePermanentRooms provisions the always-active rooms (INDIA, WORLD).
+// They start with no host; the first person to join becomes admin. They are
+// collaborative so everyone can steer playback, subject to the cooldown.
+func (h *Hub) EnsurePermanentRooms() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, pr := range PermanentRooms {
+		if _, exists := h.rooms[pr.Code]; exists {
+			continue
+		}
+		room := NewRoom(pr.Code, nil, protocol.RoomModeCollaborative)
+		room.Permanent = true
+		room.Name = pr.Name
+		h.rooms[pr.Code] = room
+	}
+}
+
 // GenerateRoomCode generates a random 6-character alphanumeric room code.
 func (h *Hub) GenerateRoomCode() string {
 	b := make([]byte, 6)
@@ -115,7 +158,11 @@ func (h *Hub) GetRoom(code string) (*Room, bool) {
 func (h *Hub) RemoveRoom(code string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.rooms, strings.ToUpper(code))
+	code = strings.ToUpper(code)
+	if room, ok := h.rooms[code]; ok && room.Permanent {
+		return
+	}
+	delete(h.rooms, code)
 }
 
 // RoomCount returns the current number of active rooms.
@@ -148,7 +195,7 @@ func (h *Hub) RunCleanupLoop(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			h.mu.Lock()
 			for code, room := range h.rooms {
-				if room.IsEmpty() {
+				if room.IsEmpty() && !room.Permanent {
 					slog.Info("cleaning up empty room", "room_code", code)
 					delete(h.rooms, code)
 				}

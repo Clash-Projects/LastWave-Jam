@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LastWave Jam</title>
+  <!--LW_META-->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600;700&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -299,6 +300,20 @@
       flex-direction: column;
       gap: 9px;
     }
+
+    .stations { width: 100%; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .stations-label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: #8a8a8a; text-align: left; }
+    .station {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border-radius: 12px; text-decoration: none; text-align: left;
+      color: inherit; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      transition: background 160ms;
+    }
+    .station:hover { background: rgba(255,255,255,0.09); }
+    .station-name { font-size: 15px; font-weight: 600; }
+    .station-meta { font-size: 12px; color: #9a9a9a; }
+    .station-join { font-size: 13px; font-weight: 700; color: var(--accent-lime); }
+    .room-title { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent-lime); }
 
     .btn {
       width: 100%;
@@ -602,6 +617,7 @@
             <span id="room-code-display" class="code-val">------</span>
             <span id="copy-hint" class="code-hint">Click to copy code</span>
           </div>
+          <div id="room-title" class="room-title hidden"></div>
 
           <div class="btn-stack">
             <a id="btn-join-app" href="#" class="btn btn-primary">
@@ -619,6 +635,10 @@
           <div class="card-header-badge">
             <span class="pulse-dot"></span>
             <span>CONNECT TO SESSION</span>
+          </div>
+
+          <div class="stations" id="stations">
+            <span class="stations-label">ALWAYS-ON ROOMS</span>
           </div>
 
           <form id="code-form" class="btn-stack">
@@ -737,9 +757,81 @@
       const codeInput = document.getElementById('code-input');
       const toast = document.getElementById('toast');
 
+      // Always-on rooms (kept in sync with the server's PermanentRooms).
+      const STATIONS = [
+        { code: 'INDIA', name: 'India' },
+        { code: 'WORLD', name: 'International' }
+      ];
+      const ROOMS_URLS = ['/rooms', 'https://jam.clashprojects.qd.je/rooms'];
+
+      function loadCounts() {
+        const try1 = function (i) {
+          if (i >= ROOMS_URLS.length) return;
+          fetch(ROOMS_URLS[i])
+            .then(function (r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+            .then(function (data) {
+              const counts = {};
+              (data.rooms || []).forEach(function (r) { counts[r.code] = r.participants; });
+              STATIONS.forEach(function (s) {
+                const el = document.getElementById('count-' + s.code);
+                if (el && counts[s.code] !== undefined) {
+                  el.textContent = counts[s.code] + ' listening';
+                }
+              });
+            })
+            .catch(function () { try1(i + 1); });
+        };
+        try1(0);
+      }
+
+      function renderStations() {
+        const box = document.getElementById('stations');
+        if (!box) return;
+        STATIONS.forEach(function (s) {
+          const a = document.createElement('a');
+          a.className = 'station';
+          a.href = '?code=' + encodeURIComponent(s.code);
+          const left = document.createElement('div');
+          const name = document.createElement('div');
+          name.className = 'station-name';
+          name.textContent = s.name;
+          const meta = document.createElement('div');
+          meta.className = 'station-meta';
+          meta.id = 'count-' + s.code;
+          meta.textContent = s.code;
+          left.appendChild(name);
+          left.appendChild(meta);
+          const join = document.createElement('span');
+          join.className = 'station-join';
+          join.textContent = 'Join →';
+          a.appendChild(left);
+          a.appendChild(join);
+          box.appendChild(a);
+        });
+        loadCounts();
+        setInterval(loadCounts, 15000);
+      }
+
       if (code.length > 0) {
+        const station = STATIONS.find(function (s) { return s.code === code; });
+        if (station) {
+          const title = document.getElementById('room-title');
+          title.textContent = station.name + ' · always-on room';
+          title.classList.remove('hidden');
+        }
         roomCodeDisplay.textContent = code;
-        btnJoinApp.href = `lastwave://jam?code=${encodeURIComponent(code)}`;
+        // Opens whichever LastWave is installed: the desktop app registers
+        // lastwave:// on Windows; Android uses an intent link so Chrome hands
+        // it straight to the app.
+        const enc = encodeURIComponent(code);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        const appLink = isAndroid
+          ? 'intent://jam?code=' + enc + '#Intent;scheme=lastwave;package=com.lastwave.app;end'
+          : 'lastwave://jam?code=' + enc;
+        btnJoinApp.href = appLink;
+        // Try once automatically; if the app is missing nothing happens and
+        // the buttons below still work.
+        setTimeout(function () { window.location.href = appLink; }, 350);
 
         btnJoinApp.onclick = function () {
           navigator.clipboard.writeText(code).catch(function () {});
@@ -774,6 +866,7 @@
           }
         };
 
+        renderStations();
         inviteView.classList.add('hidden');
         normalView.classList.remove('hidden');
       }

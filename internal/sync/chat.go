@@ -40,6 +40,19 @@ func (b *ChatBuffer) Add(msg protocol.ChatMessage) {
 	}
 }
 
+// Get returns the stored message with the given ID, if it is still buffered.
+func (b *ChatBuffer) Get(id string) (protocol.ChatMessage, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	for i := len(b.messages) - 1; i >= 0; i-- {
+		if b.messages[i].ID == id {
+			return b.messages[i], true
+		}
+	}
+	return protocol.ChatMessage{}, false
+}
+
 // History returns a snapshot of stored messages in chronological order.
 func (b *ChatBuffer) History() []protocol.ChatMessage {
 	b.mu.RLock()

@@ -62,6 +62,8 @@ func TestPermanentRoom_FirstJoinerIsHostAndLastJoinerSucceeds(t *testing.T) {
 	hub := NewHub()
 	hub.EnsurePermanentRooms()
 	room, _ := hub.GetRoom("INDIA")
+	room.Radio = false // test the non-radio permanent-room behaviour
+	room.Mode = protocol.RoomModeCollaborative
 
 	a, b, c := mockClient("a", "A"), mockClient("b", "B"), mockClient("c", "C")
 	_ = room.Join(a, "A")
@@ -90,6 +92,8 @@ func TestPermanentRoom_Cooldown(t *testing.T) {
 	hub := NewHub()
 	hub.EnsurePermanentRooms()
 	room, _ := hub.GetRoom("WORLD")
+	room.Radio = false // test the non-radio permanent-room behaviour
+	room.Mode = protocol.RoomModeCollaborative
 	clock := time.Unix(1_700_000_000, 0)
 	room.now = func() time.Time { return clock }
 
@@ -312,6 +316,8 @@ func TestHub_PublicRoomsCountsAndCooldownMessage(t *testing.T) {
 	hub := NewHub()
 	hub.EnsurePermanentRooms()
 	room, _ := hub.GetRoom("INDIA")
+	room.Radio = false // test the non-radio permanent-room behaviour
+	room.Mode = protocol.RoomModeCollaborative
 	a := mockClient("a", "A")
 	_ = room.Join(a, "Aarav")
 	infos := hub.PublicRooms()

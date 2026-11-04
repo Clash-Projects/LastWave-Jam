@@ -34,6 +34,18 @@ func main() {
 
 	hub := sync.NewHub()
 	hub.EnsurePermanentRooms()
+
+	// 24/7 radio in the always-on rooms, fed by the contribution site.
+	radioCtx, stopRadio := context.WithCancel(context.Background())
+	defer stopRadio()
+	radioSource := os.Getenv("RADIO_SOURCE_URL")
+	if radioSource == "" {
+		radioSource = "http://127.0.0.1:6969"
+	}
+	if radioSource != "off" {
+		hub.StartRadio(radioCtx, radioSource)
+		slog.Info("radio started", "source", radioSource)
+	}
 	srv := server.NewServer(server.Config{
 		Port:            port,
 		CleanupInterval: 2 * time.Minute,

@@ -18,6 +18,10 @@ type Room struct {
 	Permanent bool
 	// Name is the friendly title of a public room ("India"); empty otherwise.
 	Name string
+	// Radio rooms are 24/7 stations driven by the server: no host, no listener control.
+	Radio bool
+	// RadioKey is the contribution-site station feeding a radio room ("india").
+	RadioKey string
 
 	mu                 sync.RWMutex
 	host               *Client
@@ -161,8 +165,8 @@ func (r *Room) Join(c *Client, rawName string) error {
 	r.participants[c.ID] = c
 	r.joinedOrder = append(r.joinedOrder, c.ID)
 
-	// Promote as host if room currently has no host
-	if r.host == nil {
+	// Promote as host if room currently has no host (radio stations never have one)
+	if r.host == nil && !r.Radio {
 		r.host = c
 	}
 
@@ -199,6 +203,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 		CoHostID:     coHostID,
 		Permanent:    r.Permanent,
 		RoomName:     r.Name,
+		Radio:        r.Radio,
 		RoomMode:     r.Mode,
 		Playback:     playbackSnapshot,
 		Participants: participants,
@@ -265,7 +270,7 @@ func (r *Room) Leave(c *Client) {
 		queueCleared = true
 	}
 
-	if len(r.participants) == 0 && r.Permanent {
+	if len(r.participants) == 0 && r.Permanent && !r.Radio {
 		r.resetLocked()
 	}
 
@@ -388,6 +393,12 @@ func (r *Room) HandleChat(c *Client, rawText string, replyToID string) {
 func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.Radio {
+		c.SendError("live_station", "This is a live 24/7 station. Playback can't be controlled.")
+		r.resyncLocked(c)
+		return
+	}
 
 	isHost := r.isHostLocked(c)
 	if r.Mode == protocol.RoomModeHostOnly && !isHost {

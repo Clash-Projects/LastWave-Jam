@@ -161,6 +161,7 @@ type SyncStatePayload struct {
 	CoHostID     string        `json:"cohost_id"`
 	Permanent    bool          `json:"permanent"`
 	RoomName     string        `json:"room_name,omitempty"`
+	Radio        bool          `json:"radio,omitempty"`
 	RoomMode     string        `json:"room_mode"`
 	Playback     PlaybackState `json:"playback"`
 	Participants []Participant `json:"participants"`

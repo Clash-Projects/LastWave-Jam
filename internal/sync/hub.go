@@ -34,9 +34,9 @@ func NewHub() *Hub {
 }
 
 // PermanentRooms are the always-active rooms every server provides.
-var PermanentRooms = []struct{ Code, Name string }{
-	{"INDIA", "India"},
-	{"WORLD", "International"},
+var PermanentRooms = []struct{ Code, Name, Key string }{
+	{"INDIA", "India", "india"},
+	{"WORLD", "International", "international"},
 }
 
 // RoomInfo is the public summary of an always-active room.
@@ -59,9 +59,8 @@ func (h *Hub) PublicRooms() []RoomInfo {
 	return out
 }
 
-// EnsurePermanentRooms provisions the always-active rooms (INDIA, WORLD).
-// They start with no host; the first person to join becomes admin. They are
-// collaborative so everyone can steer playback, subject to the cooldown.
+// EnsurePermanentRooms provisions the always-active rooms (INDIA, WORLD) as
+// 24/7 radio stations: no host, nobody can control playback (see radio.go).
 func (h *Hub) EnsurePermanentRooms() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -69,8 +68,10 @@ func (h *Hub) EnsurePermanentRooms() {
 		if _, exists := h.rooms[pr.Code]; exists {
 			continue
 		}
-		room := NewRoom(pr.Code, nil, protocol.RoomModeCollaborative)
+		room := NewRoom(pr.Code, nil, protocol.RoomModeHostOnly)
 		room.Permanent = true
+		room.Radio = true
+		room.RadioKey = pr.Key
 		room.Name = pr.Name
 		h.rooms[pr.Code] = room
 	}

@@ -27,6 +27,7 @@ type Room struct {
 	host               *Client
 	coHost             *Client // at most one co-host, granted by the host
 	cooldowns          map[string]time.Time
+	seen               []string      // everyone who joined (admin panel history)
 	radioManual        bool          // radio room run by a station admin (auto radio paused)
 	radioWake          chan struct{} // nudges the radio loop on mode changes
 	now                func() time.Time
@@ -64,6 +65,7 @@ func NewRoom(code string, host *Client, mode string) *Room {
 	if host != nil {
 		r.participants[host.ID] = host
 		r.joinedOrder = append(r.joinedOrder, host.ID)
+		r.noteSeenLocked(host.Name())
 		host.SetRoom(r)
 	}
 
@@ -167,6 +169,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 	r.mu.Lock()
 	r.participants[c.ID] = c
 	r.joinedOrder = append(r.joinedOrder, c.ID)
+	r.noteSeenLocked(name)
 
 	// Promote as host if room currently has no host (radio stations never have one)
 	if r.host == nil && !r.Radio {

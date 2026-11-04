@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  var state = { rooms: [], selected: null, chatKey: '' };
+  // selected: { kind: 'live', code } | { kind: 'ended', id } | null
+  var state = { rooms: [], ended: [], selected: null, chatKey: '' };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -41,15 +42,18 @@
   }
 
   function roomLabel(r) { return r.station ? r.name + ' station' : 'Jam ' + r.code; }
+  function isSel(kind, key) {
+    return state.selected && state.selected.kind === kind && (state.selected.code === key || state.selected.id === key);
+  }
 
-  /* ---------------- room list ---------------- */
+  /* ---------------- lists ---------------- */
   function renderList() {
     var box = $('room-list');
     box.textContent = '';
     var total = 0;
     state.rooms.forEach(function (r) {
       total += r.participants.length;
-      var b = el('button', 'room' + (r.code === state.selected ? ' on' : ''));
+      var b = el('button', 'room' + (isSel('live', r.code) ? ' on' : ''));
       b.type = 'button';
       var row = el('div', 'room-row');
       row.appendChild(el('span', 'room-name', roomLabel(r)));
@@ -60,19 +64,47 @@
       if (r.station) row2.appendChild(badge(r.stationAuto ? 'Auto' : 'Admin', r.stationAuto ? 'live' : 'solid'));
       else row2.appendChild(badge('Private'));
       b.appendChild(row2);
-      b.addEventListener('click', function () { select(r.code); });
+      b.addEventListener('click', function () { select({ kind: 'live', code: r.code }); });
       box.appendChild(b);
     });
+
+    if (state.ended.length) {
+      var head = el('div', 'rooms-head mt20');
+      head.appendChild(el('span', 'tag', 'Ended · last 24 h'));
+      head.appendChild(el('span', 'count', String(state.ended.length)));
+      box.appendChild(head);
+      state.ended.forEach(function (a) {
+        var b = el('button', 'room' + (isSel('ended', a.id) ? ' on' : ''));
+        b.type = 'button';
+        var row = el('div', 'room-row');
+        row.appendChild(el('span', 'room-name', roomLabel(a.room)));
+        row.appendChild(el('span', 'count', a.chatCount + ' msgs'));
+        b.appendChild(row);
+        var row2 = el('div', 'room-row');
+        row2.appendChild(el('span', 'room-sub', 'Ended ' + clock(a.endedAt) + ' · ' + (a.room.seen || []).length + ' people'));
+        row2.appendChild(badge('Ended'));
+        b.appendChild(row2);
+        b.addEventListener('click', function () { select({ kind: 'ended', id: a.id }); });
+        box.appendChild(b);
+      });
+    }
+
     $('room-count').textContent = String(state.rooms.length);
     var tot = $('totals');
     tot.textContent = '';
     tot.appendChild(el('span', 'pulse'));
-    tot.appendChild(document.createTextNode(state.rooms.length + ' Jams · ' + total + ' listening'));
+    tot.appendChild(document.createTextNode(state.rooms.length + ' live · ' + total + ' listening · ' + state.ended.length + ' ended today'));
   }
 
-  /* ---------------- room detail ---------------- */
-  function current() {
-    for (var i = 0; i < state.rooms.length; i++) if (state.rooms[i].code === state.selected) return state.rooms[i];
+  /* ---------------- detail ---------------- */
+  function liveRoom() {
+    if (!state.selected || state.selected.kind !== 'live') return null;
+    for (var i = 0; i < state.rooms.length; i++) if (state.rooms[i].code === state.selected.code) return state.rooms[i];
+    return null;
+  }
+  function endedRoom() {
+    if (!state.selected || state.selected.kind !== 'ended') return null;
+    for (var i = 0; i < state.ended.length; i++) if (state.ended[i].id === state.selected.id) return state.ended[i];
     return null;
   }
 
@@ -86,27 +118,10 @@
       .catch(function (e) { if (e.message !== 'auth') toast(e.message); });
   }
 
-  function renderDetail() {
-    var r = current();
-    $('empty').hidden = !!r;
-    $('room').hidden = !r;
-    if (!r) return;
-
-    $('d-title').textContent = roomLabel(r);
-    var meta = $('d-meta');
-    meta.textContent = '';
-    meta.appendChild(el('span', 'count', r.code));
-    if (r.station) meta.appendChild(badge(r.stationAuto ? 'Auto radio' : 'Admin in control', r.stationAuto ? 'live' : 'solid'));
-    else meta.appendChild(badge(r.mode === 'collaborative' ? 'Everyone controls' : 'Host controls'));
-    meta.appendChild(document.createTextNode(r.participants.length + ' listening · started ' + clock(r.createdAt)));
-
-    var hasAdmin = !!r.hostId;
-    $('btn-auto').hidden = !(r.station && !r.stationAuto);
-    $('btn-unhost').hidden = r.station || !hasAdmin;
-    $('btn-unhost').textContent = 'Take host';
-
+  function renderNowPlaying(r, label) {
     var np = $('np');
     np.textContent = '';
+    $('np-title').textContent = label;
     if (r.nowPlaying) {
       var t = r.nowPlaying;
       if (t.artwork_url) {
@@ -117,10 +132,38 @@
       }
       var info = el('div');
       info.appendChild(el('div', 'np-title', t.title));
-      info.appendChild(el('div', 'np-sub', (t.artist || '') + (t.duration_ms ? ' · ' + fmt(r.positionMs) + ' / ' + fmt(t.duration_ms) : '') + (r.isPlaying ? '' : ' · paused')));
+      info.appendChild(el('div', 'np-sub', t.artist || ''));
       np.appendChild(info);
-    } else {
-      np.appendChild(el('div', 'np-sub', 'Nothing playing right now.'));
+      return info;
+    }
+    np.appendChild(el('div', 'np-sub', 'Nothing was playing.'));
+    return null;
+  }
+
+  function renderDetail() {
+    var live = liveRoom();
+    var ended = endedRoom();
+    $('empty').hidden = !!(live || ended);
+    $('room').hidden = !(live || ended);
+    $('btn-auto').hidden = true;
+    $('btn-unhost').hidden = true;
+    if (live) renderLive(live);
+    else if (ended) renderEnded(ended);
+  }
+
+  function renderLive(r) {
+    $('d-title').textContent = roomLabel(r);
+    var meta = $('d-meta');
+    meta.textContent = '';
+    meta.appendChild(el('span', 'count', r.code));
+    if (r.station) meta.appendChild(badge(r.stationAuto ? 'Auto radio' : 'Admin in control', r.stationAuto ? 'live' : 'solid'));
+    else meta.appendChild(badge(r.mode === 'collaborative' ? 'Everyone controls' : 'Host controls'));
+    meta.appendChild(document.createTextNode(r.participants.length + ' listening · started ' + clock(r.createdAt)));
+    $('btn-auto').hidden = !(r.station && !r.stationAuto);
+
+    var info = renderNowPlaying(r, 'Now playing');
+    if (info && r.nowPlaying.duration_ms) {
+      info.lastChild.textContent += ' · ' + fmt(r.positionMs) + ' / ' + fmt(r.nowPlaying.duration_ms) + (r.isPlaying ? '' : ' · paused');
     }
 
     $('people-title').textContent = 'Listeners · ' + r.participants.length;
@@ -133,20 +176,19 @@
       var right = el('div', 'person-right');
       if (p.isHost) right.appendChild(badge(r.station ? 'Admin' : 'Host', 'solid'));
       else if (p.isCoHost) right.appendChild(badge('Co-host'));
+      var base = '/admin/api/rooms/' + encodeURIComponent(r.code);
       if (p.isHost) {
         var take = el('button', 'btn ghost small', r.station ? 'Take admin' : 'Take host');
         take.type = 'button';
         take.addEventListener('click', function () {
-          act('/admin/api/rooms/' + encodeURIComponent(r.code) + '/unhost', {},
-            r.station ? 'Admin removed · station back on auto' : 'Host removed');
+          act(base + '/unhost', {}, r.station ? 'Admin removed · station back on auto' : 'Host removed');
         });
         right.appendChild(take);
       } else {
         var give = el('button', 'btn small', r.station ? 'Make admin' : 'Make host');
         give.type = 'button';
         give.addEventListener('click', function () {
-          act('/admin/api/rooms/' + encodeURIComponent(r.code) + '/host', { userId: p.id },
-            p.name + (r.station ? ' is now the station admin' : ' is now the host'));
+          act(base + '/host', { userId: p.id }, p.name + (r.station ? ' is now the station admin' : ' is now the host'));
         });
         right.appendChild(give);
       }
@@ -155,21 +197,55 @@
     });
   }
 
+  function renderEnded(a) {
+    var r = a.room;
+    $('d-title').textContent = roomLabel(r);
+    var meta = $('d-meta');
+    meta.textContent = '';
+    meta.appendChild(el('span', 'count', r.code));
+    meta.appendChild(badge('Ended'));
+    meta.appendChild(document.createTextNode('started ' + clock(r.createdAt) + ' · ended ' + clock(a.endedAt) + ' · deleted 24 h after it ended'));
+    renderNowPlaying(r, 'Last played');
+
+    var seen = r.seen || [];
+    $('people-title').textContent = 'People who joined · ' + seen.length;
+    var people = $('people');
+    people.textContent = '';
+    if (seen.length === 0) people.appendChild(el('div', 'np-sub', 'Nobody joined.'));
+    seen.forEach(function (name) {
+      var row = el('div', 'person');
+      row.appendChild(el('span', 'person-name', name));
+      people.appendChild(row);
+    });
+  }
+
   /* ---------------- chat ---------------- */
+  function chatPath() {
+    if (!state.selected) return null;
+    return state.selected.kind === 'live'
+      ? '/admin/api/rooms/' + encodeURIComponent(state.selected.code) + '/chat'
+      : '/admin/api/ended/' + encodeURIComponent(state.selected.id) + '/chat';
+  }
+
   function loadChat(force) {
-    var r = current();
-    if (!r) return;
-    api('/admin/api/rooms/' + encodeURIComponent(r.code) + '/chat')
+    var path = chatPath();
+    if (!path) return;
+    var selKey = path;
+    api(path)
       .then(function (d) {
+        if (chatPath() !== selKey) return; // selection changed meanwhile
         var msgs = d.messages || [];
-        var key = r.code + ':' + msgs.length + ':' + (msgs.length ? msgs[msgs.length - 1].id : '');
+        var key = selKey + ':' + msgs.length + ':' + (msgs.length ? msgs[msgs.length - 1].id : '');
         if (!force && key === state.chatKey) return;
         state.chatKey = key;
         var box = $('chat');
         var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
         box.textContent = '';
-        if (msgs.length === 0) box.appendChild(el('div', 'np-sub', 'No messages yet.'));
+        if (msgs.length === 0) box.appendChild(el('div', 'np-sub', 'No messages in the last 24 hours.'));
+        var lastDay = '';
         msgs.forEach(function (m) {
+          var day = new Date(m.timestamp).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+          if (day !== lastDay) { box.appendChild(el('div', 'tag', day)); lastDay = day; }
           var line = el('div', 'line');
           var head = el('div', 'line-head');
           head.appendChild(el('span', 'line-name' + (m.user_id === 'station' ? ' station' : ''), m.user_name + (m.is_host ? ' · host' : '')));
@@ -179,35 +255,33 @@
           line.appendChild(el('div', 'line-text', m.text));
           box.appendChild(line);
         });
-        $('chat-count').textContent = '· ' + msgs.length;
+        $('chat-count').textContent = '· ' + msgs.length + ' in 24 h';
         if (atBottom || force) box.scrollTop = box.scrollHeight;
       })
-      .catch(function () {});
+      .catch(function (e) { if (e.message !== 'auth') toast(e.message); });
   }
 
   /* ---------------- loop ---------------- */
-  function select(code) {
-    state.selected = code;
+  function select(sel) {
+    state.selected = sel;
     state.chatKey = '';
+    $('chat').textContent = '';
     renderList(); renderDetail(); loadChat(true);
   }
 
   function loadRooms() {
     return api('/admin/api/rooms').then(function (d) {
       state.rooms = d.rooms || [];
-      if (state.selected && !current()) state.selected = null;
-      if (!state.selected && state.rooms.length) state.selected = state.rooms[0].code;
+      state.ended = d.ended || [];
+      if (state.selected && !liveRoom() && !endedRoom()) state.selected = null;
+      if (!state.selected && state.rooms.length) state.selected = { kind: 'live', code: state.rooms[0].code };
       renderList(); renderDetail();
     }).catch(function (e) { if (e.message !== 'auth') toast(e.message); });
   }
 
   $('btn-auto').addEventListener('click', function () {
-    var r = current();
+    var r = liveRoom();
     if (r) act('/admin/api/rooms/' + encodeURIComponent(r.code) + '/auto', {}, 'Station back on auto');
-  });
-  $('btn-unhost').addEventListener('click', function () {
-    var r = current();
-    if (r) act('/admin/api/rooms/' + encodeURIComponent(r.code) + '/unhost', {}, 'Host removed');
   });
   $('logout').addEventListener('click', function () {
     api('/admin/logout', 'POST', {}).catch(function () {}).then(function () { window.location.replace('/admin/login'); });
@@ -215,5 +289,5 @@
 
   loadRooms().then(function () { loadChat(true); });
   setInterval(loadRooms, 3000);
-  setInterval(function () { loadChat(false); }, 2000);
+  setInterval(function () { loadChat(false); }, 2500);
 })();

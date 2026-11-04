@@ -211,6 +211,7 @@ type RoomView struct {
 	IsPlaying    bool                `json:"isPlaying"`
 	PositionMs   int64               `json:"positionMs"`
 	ChatCount    int                 `json:"chatCount"`
+	Seen         []string            `json:"seen"`
 }
 
 // View returns a consistent snapshot of the room for the admin panel.
@@ -226,7 +227,8 @@ func (r *Room) View() RoomView {
 		CreatedAt:   r.CreatedAt.UnixMilli(),
 		IsPlaying:   r.state.IsPlaying,
 		PositionMs:  CalculateCurrentPosition(&r.state, time.Now().UnixMilli()),
-		ChatCount:   len(r.chat.History()),
+		ChatCount:   len(r.chat.All()),
+		Seen:        append([]string{}, r.seen...),
 	}
 	if r.state.CurrentTrack != nil {
 		t := *r.state.CurrentTrack

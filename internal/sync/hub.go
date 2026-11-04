@@ -22,8 +22,9 @@ const roomCodeCharset = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 // Hub manages active listening rooms and facilitates global lifecycle events.
 type Hub struct {
-	mu    sync.RWMutex
-	rooms map[string]*Room
+	mu      sync.RWMutex
+	rooms   map[string]*Room
+	archive []*ArchivedRoom // ended rooms, kept 24 h for the admin panel
 }
 
 // NewHub constructs a new centralized room registry.
@@ -160,9 +161,11 @@ func (h *Hub) RemoveRoom(code string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	code = strings.ToUpper(code)
-	if room, ok := h.rooms[code]; ok && room.Permanent {
+	room, ok := h.rooms[code]
+	if !ok || room.Permanent {
 		return
 	}
+	h.archiveLocked(room)
 	delete(h.rooms, code)
 }
 
@@ -194,14 +197,7 @@ func (h *Hub) RunCleanupLoop(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			h.mu.Lock()
-			for code, room := range h.rooms {
-				if room.IsEmpty() && !room.Permanent {
-					slog.Info("cleaning up empty room", "room_code", code)
-					delete(h.rooms, code)
-				}
-			}
-			h.mu.Unlock()
+			h.cleanupOnce()
 		}
 	}
 }

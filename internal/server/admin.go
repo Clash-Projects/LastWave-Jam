@@ -258,12 +258,24 @@ func (h *Handler) registerAdminRoutes(mux *http.ServeMux) {
 	}))
 
 	mux.HandleFunc("GET /admin/api/rooms", need(func(w http.ResponseWriter, r *http.Request) {
-		adminJSON(w, http.StatusOK, map[string]any{"rooms": h.hub.RoomViews(), "now": time.Now().UnixMilli()})
+		adminJSON(w, http.StatusOK, map[string]any{
+			"rooms": h.hub.RoomViews(),
+			"ended": h.hub.ArchivedRooms(),
+			"now":   time.Now().UnixMilli(),
+		})
 	}))
 	mux.HandleFunc("GET /admin/api/rooms/{code}/chat", need(func(w http.ResponseWriter, r *http.Request) {
 		if rm, ok := room(w, r); ok {
-			adminJSON(w, http.StatusOK, map[string]any{"messages": rm.ChatHistory()})
+			adminJSON(w, http.StatusOK, map[string]any{"messages": rm.ChatAll()})
 		}
+	}))
+	mux.HandleFunc("GET /admin/api/ended/{id}/chat", need(func(w http.ResponseWriter, r *http.Request) {
+		msgs, ok := h.hub.ArchivedChat(r.PathValue("id"))
+		if !ok {
+			adminJSON(w, http.StatusNotFound, map[string]string{"error": "That history has expired"})
+			return
+		}
+		adminJSON(w, http.StatusOK, map[string]any{"messages": msgs})
 	}))
 	mux.HandleFunc("POST /admin/api/rooms/{code}/host", need(func(w http.ResponseWriter, r *http.Request) {
 		rm, ok := room(w, r)

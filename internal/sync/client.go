@@ -239,7 +239,7 @@ func (c *Client) dispatch(env protocol.Envelope) {
 	switch env.Type {
 	case protocol.MsgTypeChangeRoomMode:
 		r := c.CurrentRoom()
-		if r != nil && r.IsHost(c) {
+		if r != nil && r.IsHost(c) && !r.Radio {
 			var p struct {
 				RoomMode string `json:"room_mode"`
 			}
@@ -259,6 +259,19 @@ func (c *Client) dispatch(env protocol.Envelope) {
 			return
 		}
 		r.HandleQueueUpdate(c, p.Queue)
+
+	case protocol.MsgTypeTransferHost:
+		r := c.CurrentRoom()
+		if r == nil {
+			c.SendError("not_in_room", "You must be in a room")
+			return
+		}
+		var p protocol.GrantHostPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			c.SendError("invalid_payload", "Invalid transfer_host payload")
+			return
+		}
+		r.TransferStationAdmin(c, p.UserID)
 
 	case protocol.MsgTypeGrantHost, protocol.MsgTypeRevokeHost:
 		r := c.CurrentRoom()

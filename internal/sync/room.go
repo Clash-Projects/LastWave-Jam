@@ -27,6 +27,10 @@ type Room struct {
 	host               *Client
 	coHost             *Client // at most one co-host, granted by the host
 	cooldowns          map[string]time.Time
+	radioManual        bool          // radio room run by a station admin (auto radio paused)
+	radioWake          chan struct{} // nudges the radio loop on mode changes
+	adminCode          string        // station-admin code (from the server's environment)
+	cmdAttempts        map[string][]time.Time
 	now                func() time.Time
 	participants       map[string]*Client
 	joinedOrder        []string
@@ -51,6 +55,8 @@ func NewRoom(code string, host *Client, mode string) *Room {
 		chat:               NewChatBuffer(DefaultChatHistoryLimit),
 		pendingSuggestions: make(map[string]*protocol.SuggestionReceivedPayload),
 		cooldowns:          make(map[string]time.Time),
+		radioWake:          make(chan struct{}, 1),
+		cmdAttempts:        make(map[string][]time.Time),
 		now:                time.Now,
 		state: protocol.PlaybackState{
 			Queue:        make([]protocol.TrackInfo, 0),
@@ -204,6 +210,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 		Permanent:    r.Permanent,
 		RoomName:     r.Name,
 		Radio:        r.Radio,
+		StationAuto:  r.Radio && !r.radioManual,
 		RoomMode:     r.Mode,
 		Playback:     playbackSnapshot,
 		Participants: participants,
@@ -241,6 +248,25 @@ func (r *Room) Leave(c *Client) {
 	}
 
 	delete(r.cooldowns, c.ID)
+
+	if r.Radio {
+		adminLeft := r.stationAdminLeftLocked(c)
+		totalUsers := len(r.participants)
+		userName := c.Name()
+		r.mu.Unlock()
+		r.Broadcast(protocol.MsgTypeUserLeft, map[string]any{
+			"user_id":     c.ID,
+			"name":        userName,
+			"is_host":     false,
+			"total_users": totalUsers,
+		})
+		if adminLeft {
+			r.announceStationMode(nil)
+			r.postSystemChat(userName + " left. The station is back on auto.")
+			r.wakeRadio()
+		}
+		return
+	}
 
 	var newHost *Client
 	coHostCleared := false
@@ -361,6 +387,19 @@ func (r *Room) HandleChat(c *Client, rawText string, replyToID string) {
 	isHost := r.isHostLocked(c)
 	r.mu.RUnlock()
 
+	// Station commands: everyone sees that the command was typed, never the code.
+	cmd, code := "", ""
+	if r.Radio {
+		cmd, code = parseStationCommand(text)
+		if cmd != "" {
+			text = "/" + cmd + " " + maskedCode
+			replyToID = ""
+		}
+	}
+	if cmd != "" {
+		defer r.handleStationCommand(c, cmd, code)
+	}
+
 	msg := protocol.ChatMessage{
 		ID:        GenerateID("msg_"),
 		UserID:    c.ID,
@@ -394,19 +433,23 @@ func (r *Room) HandlePlayback(c *Client, p protocol.PlaybackActionPayload) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.Radio {
-		c.SendError("live_station", "This is a live 24/7 station. Playback can't be controlled.")
+	isHost := r.isHostLocked(c)
+	if r.Radio && !(r.radioManual && isHost) {
+		msg := "This is a live 24/7 station. Playback can't be controlled."
+		if r.radioManual {
+			msg = "Only the station admin can control playback."
+		}
+		c.SendError("live_station", msg)
 		r.resyncLocked(c)
 		return
 	}
 
-	isHost := r.isHostLocked(c)
 	if r.Mode == protocol.RoomModeHostOnly && !isHost {
 		c.SendError("unauthorized", "Only the host can control playback in host-only mode")
 		return
 	}
 
-	if r.Permanent && isCooldownAction(p.Action) {
+	if r.Permanent && !r.Radio && isCooldownAction(p.Action) {
 		if wait := r.cooldownRemainingLocked(c.ID); wait > 0 {
 			r.rejectRateLimitedLocked(c, wait)
 			return

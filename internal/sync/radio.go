@@ -153,7 +153,7 @@ func radioTrackInfo(t RadioTrack) protocol.TrackInfo {
 
 // radioPlay makes t the room's current track from position 0 and tells everyone.
 // Late joiners get the live position from the normal sync_state.
-func (r *Room) radioPlay(t RadioTrack, upcoming []RadioTrack) {
+func (r *Room) radioPlay(t RadioTrack, upcoming []RadioTrack) bool {
 	now := r.now().UnixMilli()
 	cur := radioTrackInfo(t)
 	queue := make([]protocol.TrackInfo, 0, len(upcoming))
@@ -162,6 +162,10 @@ func (r *Room) radioPlay(t RadioTrack, upcoming []RadioTrack) {
 	}
 
 	r.mu.Lock()
+	if r.radioManual {
+		r.mu.Unlock()
+		return false
+	}
 	r.state.CurrentTrack = &cur
 	r.state.PositionMs = 0
 	r.state.ServerTimeMs = now
@@ -182,6 +186,7 @@ func (r *Room) radioPlay(t RadioTrack, upcoming []RadioTrack) {
 		Revision:     rev,
 	})
 	r.Broadcast(protocol.MsgTypeQueueUpdated, map[string]any{"queue": queue, "host_id": "", "revision": rev})
+	return true
 }
 
 // RunRadio plays the station until ctx is cancelled. It keeps going with no
@@ -208,20 +213,34 @@ func (r *Room) RunRadio(ctx context.Context, source string) {
 		if time.Since(lastFetch) > radioRefresh {
 			refresh()
 		}
+		if !r.IsStationAuto() {
+			// A station admin is in control: wait until the station is back on auto.
+			select {
+			case <-ctx.Done():
+				return
+			case <-r.radioWake:
+			case <-time.After(radioRefresh):
+			}
+			continue
+		}
 		t, ok := p.next()
 		if !ok {
 			select {
 			case <-ctx.Done():
 				return
+			case <-r.radioWake:
 			case <-time.After(radioIdleRetry):
 			}
 			refresh()
 			continue
 		}
-		r.radioPlay(t, p.upcoming(radioQueueLen))
+		if !r.radioPlay(t, p.upcoming(radioQueueLen)) {
+			continue // an admin took over in the meantime
+		}
 		select {
 		case <-ctx.Done():
 			return
+		case <-r.radioWake:
 		case <-time.After(time.Duration(t.DurationMs)*time.Millisecond + radioGap):
 		}
 	}

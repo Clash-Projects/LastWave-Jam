@@ -66,6 +66,11 @@ func (r *Room) rejectRateLimitedLocked(c *Client, wait time.Duration) {
 // A room never has more than two hosts.
 func (r *Room) GrantCoHost(c *Client, targetID string) {
 	r.mu.Lock()
+	if r.Radio {
+		r.mu.Unlock()
+		c.SendError("not_available", "Live stations have no co-hosts. Use Make admin instead.")
+		return
+	}
 	if r.host == nil || r.host.ID != c.ID {
 		r.mu.Unlock()
 		c.SendError("unauthorized", "Only the main host can give host")

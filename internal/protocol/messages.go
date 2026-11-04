@@ -17,6 +17,7 @@ const (
 	MsgTypeGrantHost         = "grant_host"
 	MsgTypeQueueUpdate       = "queue_update"
 	MsgTypeRevokeHost        = "revoke_host"
+	MsgTypeTransferHost      = "transfer_host"
 	MsgTypePing              = "ping"
 
 	// Server -> Client
@@ -30,6 +31,7 @@ const (
 	MsgTypeCoHostChanged      = "cohost_changed"
 	MsgTypeQueueUpdated       = "queue_updated"
 	MsgTypeCooldown           = "cooldown"
+	MsgTypeStationMode        = "station_mode"
 	MsgTypeRoomModeChanged    = "room_mode_changed"
 	MsgTypeSuggestionReceived = "suggestion_received"
 	MsgTypePong               = "pong"
@@ -162,6 +164,7 @@ type SyncStatePayload struct {
 	Permanent    bool          `json:"permanent"`
 	RoomName     string        `json:"room_name,omitempty"`
 	Radio        bool          `json:"radio,omitempty"`
+	StationAuto  bool          `json:"station_auto"`
 	RoomMode     string        `json:"room_mode"`
 	Playback     PlaybackState `json:"playback"`
 	Participants []Participant `json:"participants"`
@@ -202,4 +205,11 @@ const MaxSharedQueue = 5
 // QueueUpdatePayload is sent by the main host to publish their upcoming queue.
 type QueueUpdatePayload struct {
 	Queue []TrackInfo `json:"queue"`
+}
+
+// StationModePayload tells a radio room whether it is on auto or run by an admin.
+type StationModePayload struct {
+	Auto      bool   `json:"auto"`
+	AdminID   string `json:"admin_id,omitempty"`
+	AdminName string `json:"admin_name,omitempty"`
 }

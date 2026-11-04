@@ -42,6 +42,8 @@ func main() {
 	if radioSource == "" {
 		radioSource = "http://127.0.0.1:6969"
 	}
+	// Station-admin chat code (/admin, /auto). Lives only in the server's environment.
+	hub.SetRadioAdminCode(os.Getenv("RADIO_ADMIN_CODE"))
 	if radioSource != "off" {
 		hub.StartRadio(radioCtx, radioSource)
 		slog.Info("radio started", "source", radioSource)

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Jam admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <main class="login">
+    <form class="card" id="login" novalidate>
+      <span class="tag">LastWave Jam</span>
+      <h1>Admin sign in</h1>
+      <div>
+        <label class="lbl" for="password">Password</label>
+        <input class="field" id="password" type="password" autocomplete="current-password" required autofocus>
+      </div>
+      <div class="msg" id="error" hidden role="alert"></div>
+      <button class="btn" type="submit" id="go">Sign in</button>
+    </form>
+  </main>
+  <script src="/admin/login.js"></script>
+</body>
+</html>

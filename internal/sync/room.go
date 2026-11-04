@@ -29,8 +29,6 @@ type Room struct {
 	cooldowns          map[string]time.Time
 	radioManual        bool          // radio room run by a station admin (auto radio paused)
 	radioWake          chan struct{} // nudges the radio loop on mode changes
-	adminCode          string        // station-admin code (from the server's environment)
-	cmdAttempts        map[string][]time.Time
 	now                func() time.Time
 	participants       map[string]*Client
 	joinedOrder        []string
@@ -56,7 +54,6 @@ func NewRoom(code string, host *Client, mode string) *Room {
 		pendingSuggestions: make(map[string]*protocol.SuggestionReceivedPayload),
 		cooldowns:          make(map[string]time.Time),
 		radioWake:          make(chan struct{}, 1),
-		cmdAttempts:        make(map[string][]time.Time),
 		now:                time.Now,
 		state: protocol.PlaybackState{
 			Queue:        make([]protocol.TrackInfo, 0),
@@ -386,19 +383,6 @@ func (r *Room) HandleChat(c *Client, rawText string, replyToID string) {
 	r.mu.RLock()
 	isHost := r.isHostLocked(c)
 	r.mu.RUnlock()
-
-	// Station commands: everyone sees that the command was typed, never the code.
-	cmd, code := "", ""
-	if r.Radio {
-		cmd, code = parseStationCommand(text)
-		if cmd != "" {
-			text = "/" + cmd + " " + maskedCode
-			replyToID = ""
-		}
-	}
-	if cmd != "" {
-		defer r.handleStationCommand(c, cmd, code)
-	}
 
 	msg := protocol.ChatMessage{
 		ID:        GenerateID("msg_"),

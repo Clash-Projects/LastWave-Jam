@@ -27,12 +27,14 @@ var upgrader = websocket.Upgrader{
 type Handler struct {
 	hub       *sync.Hub
 	startTime time.Time
+	admin     *adminAuth
 }
 
 func NewHandler(hub *sync.Hub) *Handler {
 	return &Handler{
 		hub:       hub,
 		startTime: time.Now(),
+		admin:     newAdminAuth(),
 	}
 }
 
@@ -42,6 +44,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ws", h.handleWebSocket)
 	mux.HandleFunc("GET /rooms", h.handleRooms)
 	mux.HandleFunc("GET /og/{file}", h.handleOG)
+	h.registerAdminRoutes(mux)
 
 	// Serve self-contained invite landing page
 	indexHTML, err := embeddedWebFS.ReadFile("web/index.html")

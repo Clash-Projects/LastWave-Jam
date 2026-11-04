@@ -1,69 +1,30 @@
 package sync
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
-	"strings"
+	"errors"
+	"sort"
 	"time"
 
 	"github.com/Clash-Projects/lastwave-jam/internal/protocol"
 )
 
-// Station admin for the 24/7 radio rooms.
+// Room administration: used by the web admin panel (/admin) and by the in-app
+// "Make admin" on live stations.
 //
-//   /admin <code>  in chat: you become the station admin; the auto radio pauses
-//                  and your player drives the station for everyone.
-//   /auto <code>   in chat: the station goes back to auto radio.
-//
-// The command line is shown to the room with the code masked. The code lives
-// only in the server's environment (RADIO_ADMIN_CODE), never in the apps.
-// The admin can hand admin to someone else (transfer_host); there are no
-// co-hosts on stations. When the admin leaves, the station returns to auto.
+// On the 24/7 stations (INDIA, WORLD) an admin pauses the auto radio and their
+// player drives the station; taking admin away (or "Make auto") returns the
+// station to auto. There are no co-hosts on stations, and when the station
+// admin leaves the station goes back to auto.
 
 const (
-	cmdAttemptLimit  = 5
-	cmdAttemptWindow = 10 * time.Minute
-	stationUserID    = "station"
-	stationUserName  = "Station"
-	maskedCode       = "••••••"
+	stationUserID   = "station"
+	stationUserName = "Station"
 )
 
-// SetRadioAdminCode sets the station-admin code on every radio room ("" disables commands).
-func (h *Hub) SetRadioAdminCode(code string) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	for _, room := range h.rooms {
-		if room.Radio {
-			room.mu.Lock()
-			room.adminCode = strings.TrimSpace(code)
-			room.mu.Unlock()
-		}
-	}
-}
-
-func codeMatches(given, want string) bool {
-	if want == "" {
-		return false
-	}
-	a := sha256.Sum256([]byte(given))
-	b := sha256.Sum256([]byte(want))
-	return subtle.ConstantTimeCompare(a[:], b[:]) == 1
-}
-
-// parseStationCommand returns ("admin"|"auto", code) for a station command, or "".
-func parseStationCommand(text string) (string, string) {
-	f := strings.Fields(text)
-	if len(f) == 0 {
-		return "", ""
-	}
-	switch strings.ToLower(f[0]) {
-	case "/admin":
-		return "admin", strings.Join(f[1:], " ")
-	case "/auto":
-		return "auto", strings.Join(f[1:], " ")
-	}
-	return "", ""
-}
+var (
+	ErrUserNotInRoom = errors.New("user not in room")
+	ErrNotStation    = errors.New("not a live station")
+)
 
 // wakeRadio nudges the radio loop after a mode change.
 func (r *Room) wakeRadio() {
@@ -93,81 +54,33 @@ func (r *Room) postSystemChat(text string) {
 	r.Broadcast(protocol.MsgTypeChatMessage, msg)
 }
 
-func (r *Room) announceStationMode(admin *Client) {
-	hostID, adminName := "", ""
+// announceHost tells the room who the host/admin is now (admin == nil: nobody).
+func (r *Room) announceHost(admin *Client, coHostID string) {
+	hostID, name := "", ""
 	if admin != nil {
-		hostID, adminName = admin.ID, admin.Name()
+		hostID, name = admin.ID, admin.Name()
 	}
 	r.Broadcast(protocol.MsgTypeHostChanged, map[string]any{
 		"new_host_id":   hostID,
-		"new_host_name": adminName,
+		"new_host_name": name,
 		"user_id":       hostID,
-		"name":          adminName,
+		"name":          name,
 		"is_host":       admin != nil,
 		"host_id":       hostID,
-		"cohost_id":     "",
-	})
-	r.Broadcast(protocol.MsgTypeStationMode, protocol.StationModePayload{
-		Auto:      admin == nil,
-		AdminID:   hostID,
-		AdminName: adminName,
+		"cohost_id":     coHostID,
 	})
 }
 
-// handleStationCommand runs a /admin or /auto chat command. The masked command
-// line has already been posted to the chat.
-func (r *Room) handleStationCommand(c *Client, cmd, code string) {
-	now := r.now()
-	r.mu.Lock()
-	if r.adminCode == "" {
-		r.mu.Unlock()
-		c.SendError("commands_disabled", "Station commands are not set up on this server.")
-		return
+func (r *Room) announceStationMode(admin *Client) {
+	r.announceHost(admin, "")
+	payload := protocol.StationModePayload{Auto: admin == nil}
+	if admin != nil {
+		payload.AdminID, payload.AdminName = admin.ID, admin.Name()
 	}
-	recent := r.cmdAttempts[c.ID][:0]
-	for _, t := range r.cmdAttempts[c.ID] {
-		if now.Sub(t) < cmdAttemptWindow {
-			recent = append(recent, t)
-		}
-	}
-	if len(recent) >= cmdAttemptLimit {
-		r.cmdAttempts[c.ID] = recent
-		r.mu.Unlock()
-		c.SendError("too_many_attempts", "Too many wrong codes. Try again later.")
-		return
-	}
-	if !codeMatches(code, r.adminCode) {
-		r.cmdAttempts[c.ID] = append(recent, now)
-		r.mu.Unlock()
-		c.SendError("wrong_code", "Wrong code.")
-		return
-	}
-	delete(r.cmdAttempts, c.ID)
-
-	if cmd == "admin" {
-		r.host = c
-		r.coHost = nil
-		r.radioManual = true
-		r.mu.Unlock()
-		r.announceStationMode(c)
-		r.postSystemChat(c.Name() + " is now the station admin. Auto radio is paused.")
-		r.wakeRadio()
-		return
-	}
-
-	wasManual := r.radioManual
-	r.host = nil
-	r.coHost = nil
-	r.radioManual = false
-	r.mu.Unlock()
-	r.announceStationMode(nil)
-	if wasManual {
-		r.postSystemChat(c.Name() + " switched the station back to auto.")
-	}
-	r.wakeRadio()
+	r.Broadcast(protocol.MsgTypeStationMode, payload)
 }
 
-// TransferStationAdmin lets the station admin make someone else admin.
+// TransferStationAdmin lets the station admin make someone else admin (in-app).
 func (r *Room) TransferStationAdmin(c *Client, targetID string) {
 	r.mu.Lock()
 	if !r.Radio {
@@ -195,7 +108,6 @@ func (r *Room) TransferStationAdmin(c *Client, targetID string) {
 // stationAdminLeftLocked is called from Leave with r.mu held; it reports whether
 // the leaving client was the station admin (the station then returns to auto).
 func (r *Room) stationAdminLeftLocked(c *Client) bool {
-	delete(r.cmdAttempts, c.ID)
 	if r.host == nil || r.host.ID != c.ID {
 		return false
 	}
@@ -203,4 +115,168 @@ func (r *Room) stationAdminLeftLocked(c *Client) bool {
 	r.coHost = nil
 	r.radioManual = false
 	return true
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin panel actions                                                 */
+/* ------------------------------------------------------------------ */
+
+// AdminGiveHost makes a participant the host (private rooms) or the station
+// admin (live stations, which pauses the auto radio).
+func (r *Room) AdminGiveHost(userID string) error {
+	r.mu.Lock()
+	target, ok := r.participants[userID]
+	if !ok {
+		r.mu.Unlock()
+		return ErrUserNotInRoom
+	}
+	if r.Radio {
+		r.host = target
+		r.coHost = nil
+		r.radioManual = true
+		r.mu.Unlock()
+		r.announceStationMode(target)
+		r.postSystemChat(target.Name() + " is now the station admin.")
+		r.wakeRadio()
+		return nil
+	}
+	if r.coHost != nil && r.coHost.ID == userID {
+		r.coHost = nil
+	}
+	r.host = target
+	_, coHostID := r.hostIDsLocked()
+	r.mu.Unlock()
+	r.announceHost(target, coHostID)
+	r.postSystemChat(target.Name() + " is now the host.")
+	return nil
+}
+
+// AdminTakeHost removes the host/admin. Live stations go back to auto radio.
+func (r *Room) AdminTakeHost() error {
+	r.mu.Lock()
+	if r.Radio {
+		wasManual := r.radioManual
+		r.host = nil
+		r.coHost = nil
+		r.radioManual = false
+		r.mu.Unlock()
+		r.announceStationMode(nil)
+		if wasManual {
+			r.postSystemChat("The station is back on auto.")
+		}
+		r.wakeRadio()
+		return nil
+	}
+	if r.host == nil && r.coHost == nil {
+		r.mu.Unlock()
+		return nil
+	}
+	r.host = nil
+	r.coHost = nil
+	r.mu.Unlock()
+	r.announceHost(nil, "")
+	r.postSystemChat("The host was removed.")
+	return nil
+}
+
+// AdminMakeAuto puts a live station back on auto radio.
+func (r *Room) AdminMakeAuto() error {
+	if !r.Radio {
+		return ErrNotStation
+	}
+	return r.AdminTakeHost()
+}
+
+// ParticipantView is a listener as shown in the admin panel.
+type ParticipantView struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IsHost   bool   `json:"isHost"`
+	IsCoHost bool   `json:"isCoHost"`
+}
+
+// RoomView is a room as shown in the admin panel.
+type RoomView struct {
+	Code         string              `json:"code"`
+	Name         string              `json:"name"`
+	Station      bool                `json:"station"`
+	StationAuto  bool                `json:"stationAuto"`
+	Mode         string              `json:"mode"`
+	CreatedAt    int64               `json:"createdAt"`
+	HostID       string              `json:"hostId"`
+	HostName     string              `json:"hostName"`
+	CoHostID     string              `json:"coHostId"`
+	Participants []ParticipantView   `json:"participants"`
+	NowPlaying   *protocol.TrackInfo `json:"nowPlaying"`
+	IsPlaying    bool                `json:"isPlaying"`
+	PositionMs   int64               `json:"positionMs"`
+	ChatCount    int                 `json:"chatCount"`
+}
+
+// View returns a consistent snapshot of the room for the admin panel.
+func (r *Room) View() RoomView {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	v := RoomView{
+		Code:        r.Code,
+		Name:        r.Name,
+		Station:     r.Radio,
+		StationAuto: r.Radio && !r.radioManual,
+		Mode:        r.Mode,
+		CreatedAt:   r.CreatedAt.UnixMilli(),
+		IsPlaying:   r.state.IsPlaying,
+		PositionMs:  CalculateCurrentPosition(&r.state, time.Now().UnixMilli()),
+		ChatCount:   len(r.chat.History()),
+	}
+	if r.state.CurrentTrack != nil {
+		t := *r.state.CurrentTrack
+		v.NowPlaying = &t
+	}
+	if r.host != nil {
+		v.HostID, v.HostName = r.host.ID, r.host.Name()
+	}
+	if r.coHost != nil {
+		v.CoHostID = r.coHost.ID
+	}
+	for _, id := range r.joinedOrder {
+		p, ok := r.participants[id]
+		if !ok {
+			continue
+		}
+		v.Participants = append(v.Participants, ParticipantView{
+			ID:       p.ID,
+			Name:     p.Name(),
+			IsHost:   v.HostID == p.ID,
+			IsCoHost: v.CoHostID == p.ID,
+		})
+	}
+	if v.Participants == nil {
+		v.Participants = []ParticipantView{}
+	}
+	return v
+}
+
+// RoomViews lists every active room: stations first, then busiest rooms.
+func (h *Hub) RoomViews() []RoomView {
+	h.mu.RLock()
+	rooms := make([]*Room, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		rooms = append(rooms, r)
+	}
+	h.mu.RUnlock()
+
+	out := make([]RoomView, 0, len(rooms))
+	for _, r := range rooms {
+		out = append(out, r.View())
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Station != out[j].Station {
+			return out[i].Station
+		}
+		if len(out[i].Participants) != len(out[j].Participants) {
+			return len(out[i].Participants) > len(out[j].Participants)
+		}
+		return out[i].CreatedAt < out[j].CreatedAt
+	})
+	return out
 }

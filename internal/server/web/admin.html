@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Jam admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">LastWave Jam <span>· Admin</span></div>
+    <div class="top-right">
+      <span id="totals"><span class="pulse"></span>Loading…</span>
+      <button class="btn ghost small" id="logout" type="button">Log out</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rooms" aria-label="Active Jams">
+      <div class="rooms-head"><span class="tag">Active Jams</span><span class="count" id="room-count"></span></div>
+      <div id="room-list"></div>
+    </aside>
+
+    <main class="detail" id="detail">
+      <div class="empty" id="empty">Pick a Jam on the left.</div>
+
+      <div id="room" hidden>
+        <div class="d-head">
+          <div>
+            <div class="d-title" id="d-title"></div>
+            <div class="d-meta" id="d-meta"></div>
+          </div>
+          <div class="person-right">
+            <button class="btn small" id="btn-auto" type="button" hidden>Make auto</button>
+            <button class="btn ghost small" id="btn-unhost" type="button" hidden>Take admin</button>
+          </div>
+        </div>
+
+        <section class="panel mt18" id="np-panel">
+          <h3>Now playing</h3>
+          <div class="np" id="np"></div>
+        </section>
+
+        <div class="grid2 mt20">
+          <section class="panel">
+            <h3 id="people-title">Listeners</h3>
+            <div class="people" id="people"></div>
+          </section>
+          <section class="panel">
+            <h3>Chat <span class="count" id="chat-count"></span></h3>
+            <div class="chat" id="chat" aria-live="polite"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

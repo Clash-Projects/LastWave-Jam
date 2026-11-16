@@ -3,161 +3,223 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 <title>LastWave Jam</title>
 <!--LW_META-->
 <style>
   :root {
-    --bg: #000; --s1: #0a0a0a; --s2: #121212; --s3: #1a1a1a;
-    --line: #1f1f1f; --line-2: #2a2a2a;
-    --text: #fafafa; --muted: #a3a3a3; --faint: #5c5c5c;
-    --r: 14px; --gut: 16px;
+    --bg: #000; --s1: #0b0b0b; --s2: #131313; --s3: #1c1c1c;
+    --line: #1f1f1f; --line-2: #2b2b2b;
+    --text: #fafafa; --muted: #a1a1a1; --faint: #5e5e5e;
+    --r: 16px; --gut: 20px; --hdr: 60px; --nav: 68px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
     --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text); }
-  body { min-height: 100vh; min-height: 100dvh; font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; letter-spacing: -0.005em; }
+  body { min-height: 100vh; min-height: 100dvh; font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; letter-spacing: -0.006em; }
   button, input { font: inherit; color: inherit; }
   a { color: inherit; text-decoration: none; }
+  svg { display: block; }
   .hidden { display: none !important; }
   .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  :focus-visible { outline: 1.5px solid var(--text); outline-offset: 2px; }
+  :focus-visible { outline: 1.5px solid var(--text); outline-offset: 3px; }
   ::selection { background: var(--text); color: var(--bg); }
+  .label { font: 500 11px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
 
-  /* ---- shared controls ---- */
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 44px; padding: 0 20px;
-    border-radius: 999px; border: 1px solid var(--line-2); background: transparent; cursor: pointer; font-weight: 550; white-space: nowrap;
-    transition: background-color .15s, border-color .15s, color .15s; }
-  .btn:hover { border-color: #3d3d3d; background: var(--s2); }
-  .btn.solid { background: var(--text); border-color: var(--text); color: var(--bg); }
-  .btn.solid:hover { background: #d9d9d9; border-color: #d9d9d9; }
-  .btn:disabled { opacity: .35; cursor: default; }
-  .btn svg { width: 16px; height: 16px; flex: none; }
-  .field { width: 100%; height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--s1); outline: none; transition: border-color .15s; }
-  .field:focus { border-color: var(--muted); }
+  /* ---- controls ---- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 48px; padding: 0 22px;
+    border-radius: 999px; border: 1px solid var(--line-2); background: transparent; cursor: pointer; font-weight: 560; white-space: nowrap;
+    transition: background-color .15s, border-color .15s, opacity .15s; }
+  .btn:hover { border-color: #3f3f3f; background: var(--s2); }
+  .btn.solid { background: var(--text); border-color: var(--text); color: #000; }
+  .btn.solid:hover { background: #dedede; border-color: #dedede; }
+  .btn:disabled { opacity: .3; cursor: default; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .field { width: 100%; height: 52px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--s1); outline: none; transition: border-color .15s; }
+  .field:focus { border-color: #6b6b6b; }
   .field::placeholder { color: var(--faint); }
-  .label { font: 500 11px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
 
-  /* ---- header / footer ---- */
-  header { position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
-  .bar { max-width: 1180px; margin: 0 auto; height: 56px; padding: 0 var(--gut); display: flex; align-items: center; gap: 16px; }
-  .mark { font-weight: 700; letter-spacing: -0.02em; font-size: 15px; }
-  .mark i { font-style: normal; color: var(--faint); font-weight: 500; }
-  .meta-bar { display: flex; align-items: center; gap: 16px; margin-left: auto; font-size: 13px; color: var(--muted); }
-  .meta-bar .code { font-family: var(--mono); letter-spacing: .12em; color: var(--text); }
-  .live { display: inline-flex; align-items: center; gap: 7px; }
-  .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--text); }
-  footer { border-top: 1px solid var(--line); }
-  .foot { max-width: 1180px; margin: 0 auto; padding: 18px var(--gut) calc(18px + env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; font-size: 12.5px; color: var(--faint); }
-  .foot .links { display: flex; gap: 18px; margin-left: auto; }
-  .foot a { color: var(--muted); } .foot a:hover { color: var(--text); }
+  /* ---- header ---- */
+  header { position: sticky; top: 0; z-index: 4; height: var(--hdr); background: rgba(0,0,0,.92); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1240px; height: 100%; margin: 0 auto; padding: 0 var(--gut); display: flex; align-items: center; gap: 14px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.02em; }
+  .logo .glyph { width: 26px; height: 26px; border-radius: 7px; background: var(--text); color: #000; display: grid; place-items: center; }
+  .logo .glyph svg { width: 15px; height: 15px; }
+  .logo i { font-style: normal; color: var(--faint); font-weight: 500; }
+  .hdr-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .pill.code { font-family: var(--mono); letter-spacing: .14em; color: var(--text); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text); }
 
   /* ---- join ---- */
-  .join { min-height: calc(100vh - 57px - 60px); min-height: calc(100dvh - 57px - 60px); display: grid; place-items: center; padding: 40px var(--gut); }
-  .join-card { width: 100%; max-width: 400px; }
-  .join h1 { margin: 14px 0 6px; font-size: 30px; line-height: 1.15; font-weight: 650; letter-spacing: -0.03em; }
-  .join .sub { color: var(--muted); margin: 0 0 28px; }
-  .join .code-l { font: 600 40px/1 var(--mono); letter-spacing: .18em; margin: 6px 0 32px; overflow-wrap: anywhere; }
-  .join form { display: grid; gap: 10px; }
-  .join .or { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 12px; margin: 18px 0; }
+  .join { min-height: calc(100dvh - var(--hdr)); display: grid; place-items: center; padding: 48px var(--gut) calc(48px + var(--safe-b)); }
+  .join-card { width: 100%; max-width: 420px; }
+  .join h1 { margin: 16px 0 10px; font-size: clamp(32px, 7vw, 44px); line-height: 1.05; font-weight: 680; letter-spacing: -0.04em; }
+  .join .sub { color: var(--muted); margin: 0 0 36px; font-size: 16px; }
+  .codebox { border: 1px solid var(--line-2); border-radius: var(--r); padding: 20px 22px; margin-bottom: 20px; background: var(--s1); }
+  .codebox .v { margin-top: 12px; font: 600 34px/1 var(--mono); letter-spacing: .2em; overflow-wrap: anywhere; }
+  .join form { display: grid; gap: 12px; }
+  .join .btn { width: 100%; height: 52px; }
+  .join .or { display: flex; align-items: center; gap: 14px; color: var(--faint); font-size: 12px; margin: 22px 0; }
   .join .or::before, .join .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-  .join .btn { width: 100%; height: 48px; }
-  .join .msg { min-height: 20px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .join .msg { min-height: 22px; margin-top: 18px; font-size: 13.5px; color: var(--muted); }
 
-  /* ---- room ---- */
-  .room { max-width: 1180px; margin: 0 auto; padding: 32px var(--gut) 40px; display: grid; gap: 32px; }
-  @media (min-width: 920px) { .room { grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; align-items: start; padding-top: 48px; } }
-  .room > * { min-width: 0; }
-  .player { display: grid; gap: 28px; }
-  @media (min-width: 640px) and (max-width: 919px) { .player { grid-template-columns: 260px minmax(0, 1fr); align-items: center; } }
-  @media (min-width: 920px) { .player { grid-template-columns: minmax(220px, 340px) minmax(0, 1fr); align-items: end; } }
-  .cover { position: relative; aspect-ratio: 1; width: 100%; max-width: 420px; border-radius: var(--r); overflow: hidden; background: var(--s2); border: 1px solid var(--line); }
-  @media (max-width: 639px) { .cover { margin: 0 auto; max-width: 360px; } }
-  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* ---- room: desktop grid ---- */
+  .room { max-width: 1240px; margin: 0 auto; padding: 48px var(--gut) 56px; display: grid; gap: 40px 56px;
+    grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "player chat" "next chat"; align-items: start; }
+  .pane-player { grid-area: player; min-width: 0; }
+  .pane-next { grid-area: next; min-width: 0; }
+  .pane-chat { grid-area: chat; min-width: 0; }
+
+  /* player */
+  .player { display: grid; grid-template-columns: minmax(240px, 380px) minmax(0, 1fr); gap: 40px; align-items: center; }
+  .cover { position: relative; aspect-ratio: 1; width: 100%; border-radius: 18px; overflow: hidden; background: var(--s2); border: 1px solid var(--line); box-shadow: 0 30px 60px -30px rgba(255,255,255,.08); }
+  .cover img { width: 100%; height: 100%; object-fit: cover; }
   .cover .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); }
-  .cover .ph svg { width: 40px; height: 40px; }
-  .np { min-width: 0; display: grid; gap: 22px; }
-  .np .title { margin: 8px 0 0; font-size: clamp(24px, 3.4vw, 38px); font-weight: 650; line-height: 1.1; letter-spacing: -0.03em; overflow-wrap: anywhere; }
-  .np .artist { margin-top: 8px; font-size: 17px; color: var(--muted); }
-  .seek { display: grid; gap: 8px; }
-  .rail { position: relative; height: 3px; border-radius: 3px; background: var(--s3); overflow: hidden; }
+  .cover .ph svg { width: 44px; height: 44px; }
+  .np { min-width: 0; display: grid; gap: 28px; }
+  .np .title { margin: 12px 0 0; font-size: clamp(28px, 3.6vw, 44px); font-weight: 680; line-height: 1.05; letter-spacing: -0.035em; overflow-wrap: anywhere; }
+  .np .artist { margin-top: 10px; font-size: 18px; color: var(--muted); }
+  .seek { display: grid; gap: 10px; }
+  .rail { position: relative; height: 4px; border-radius: 4px; background: var(--s3); overflow: hidden; }
   .rail .buf { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--line-2); }
-  .rail .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--text); }
+  .rail .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--text); border-radius: 4px; }
   .times { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--faint); }
-  .ctl { display: flex; align-items: center; gap: 16px; }
-  .ctl .btn.solid { height: 52px; padding: 0 28px; font-size: 15px; }
-  .vol { display: flex; align-items: center; gap: 10px; color: var(--faint); flex: 1; max-width: 180px; margin-left: auto; }
-  .vol svg { width: 16px; height: 16px; flex: none; }
-  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 3px; border-radius: 3px; background: var(--s3); outline: none; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 0; cursor: pointer; }
-  input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 0; cursor: pointer; }
-  .status { font-size: 13px; color: var(--muted); min-height: 20px; }
+  .ctl { display: flex; align-items: center; gap: 20px; }
+  .ctl .main { height: 56px; padding: 0 30px; font-size: 15.5px; }
+  .ctl .main .i-live, .ctl .main.live .i-play, .ctl .main.muted .i-live, .ctl .main:not(.muted) .i-mute { display: none; }
+  .ctl .main.live .i-live { display: block; }
+  .ctl .main.muted { background: transparent; color: var(--text); border-color: var(--line-2); }
+  .vol { display: flex; align-items: center; gap: 12px; color: var(--faint); flex: 1; max-width: 200px; margin-left: auto; }
+  .vol svg { width: 18px; height: 18px; flex: none; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 4px; background: var(--s3); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+  .status { font-size: 13.5px; color: var(--muted); min-height: 21px; display: flex; gap: 8px; align-items: center; }
   .status.warn, .status.bad { color: var(--text); }
-  .status.warn::before, .status.bad::before { content: "— "; color: var(--faint); }
+  .status.warn::before, .status.bad::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--text); flex: none; }
 
-  .upnext { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 36px; display: grid; gap: 14px; }
-  .q { display: grid; gap: 4px; }
-  .row { display: grid; grid-template-columns: 24px 40px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 8px 0; }
+  /* up next */
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .row { display: grid; grid-template-columns: 28px 48px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
   .row .n { font: 12px var(--mono); color: var(--faint); }
-  .row img, .row .sq { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: var(--s2); }
-  .row .t { font-weight: 550; } .row .a { font-size: 13px; color: var(--muted); }
-  .row .tag { font: 11px var(--mono); color: var(--faint); letter-spacing: .06em; }
-  .empty { color: var(--faint); font-size: 13px; }
+  .row img, .row .sq { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--s2); }
+  .row .t { font-weight: 580; } .row .a { font-size: 13.5px; color: var(--muted); margin-top: 1px; }
+  .row .tag { font: 10.5px var(--mono); color: var(--muted); letter-spacing: .1em; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px 8px; }
+  .row .tag:empty { display: none; }
+  .empty { color: var(--faint); font-size: 14px; padding: 12px 0; }
+  .get { display: none; }
 
-  /* ---- chat ---- */
-  .chat { border: 1px solid var(--line); border-radius: var(--r); background: var(--s1); display: flex; flex-direction: column; height: 520px; min-height: 0; }
-  @media (min-width: 920px) { .chat { position: sticky; top: 88px; height: calc(100vh - 128px); height: calc(100dvh - 128px); max-height: 760px; } }
-  .chat-h { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  /* chat */
+  .chat { border: 1px solid var(--line); border-radius: var(--r); background: var(--s1); display: flex; flex-direction: column;
+    position: sticky; top: calc(var(--hdr) + 28px); height: calc(100dvh - var(--hdr) - 56px); max-height: 780px; min-height: 420px; }
+  .chat-h { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
   .chat-h .c { font: 12px var(--mono); color: var(--faint); }
-  .msgs { flex: 1; overflow-y: auto; padding: 8px 18px 14px; overscroll-behavior: contain; }
-  .m { padding: 10px 0; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; }
+  .msgs { flex: 1; overflow-y: auto; padding: 6px 20px 14px; overscroll-behavior: contain; }
+  .m { padding: 12px 0; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
   .m + .m { border-top: 1px solid var(--line); }
-  .av { width: 28px; height: 28px; border-radius: 50%; background: var(--s3); border: 1px solid var(--line-2); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--muted); }
-  .m .who { font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-  .m .who .h { font: 10px var(--mono); letter-spacing: .1em; color: var(--faint); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 5px; }
-  .m .who time { margin-left: auto; font: 11px var(--mono); color: var(--faint); font-weight: 400; }
-  .m .tx { color: #d4d4d4; overflow-wrap: anywhere; margin-top: 2px; }
-  .m .rp { font-size: 12px; color: var(--faint); border-left: 1px solid var(--line-2); padding-left: 8px; margin-top: 4px; overflow-wrap: anywhere; }
-  .m.me .av { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .msgs .empty { padding: 32px 0; text-align: center; }
-  .compose { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
-  .compose .field { height: 44px; background: var(--bg); }
-  .compose .btn { height: 44px; width: 44px; padding: 0; flex: none; }
+  .av { width: 32px; height: 32px; border-radius: 50%; background: var(--s3); border: 1px solid var(--line-2); display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .m .who { font-size: 13.5px; font-weight: 620; display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .m .who .h { font: 9.5px var(--mono); letter-spacing: .12em; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 7px; }
+  .m .who time { margin-left: auto; font: 11px var(--mono); color: var(--faint); font-weight: 400; flex: none; }
+  .m .tx { color: #d6d6d6; overflow-wrap: anywhere; margin-top: 3px; }
+  .m .rp { font-size: 12.5px; color: var(--faint); border-left: 2px solid var(--line-2); padding-left: 10px; margin-top: 6px; overflow-wrap: anywhere; }
+  .m.me .av { background: var(--text); color: #000; border-color: var(--text); }
+  .msgs .empty { display: grid; place-items: center; gap: 10px; height: 100%; text-align: center; color: var(--faint); }
+  .msgs .empty svg { width: 28px; height: 28px; margin: 0 auto; }
+  .compose { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); }
+  .compose .field { height: 48px; background: var(--bg); }
+  .compose .btn { height: 48px; width: 48px; padding: 0; flex: none; }
+
+  /* footer: icon above label */
+  footer { border-top: 1px solid var(--line); }
+  .foot { max-width: 1240px; margin: 0 auto; padding: 28px var(--gut); display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: center; }
+  .foot .note { font-size: 13px; color: var(--faint); max-width: 420px; }
+  .links { display: flex; gap: 8px; margin-left: auto; }
+  .lk { display: grid; justify-items: center; gap: 8px; min-width: 78px; padding: 12px 10px; border-radius: 14px; border: 1px solid transparent; color: var(--muted); font-size: 12.5px; transition: border-color .15s, color .15s, background-color .15s; }
+  .lk svg { width: 22px; height: 22px; }
+  .lk:hover { color: var(--text); border-color: var(--line-2); background: var(--s1); }
+
+  /* nav: phones and tablets only */
+  .nav { display: none; }
+
+  /* ---- tablets ---- */
+  @media (max-width: 1080px) {
+    .room { grid-template-columns: minmax(0, 1fr) 340px; gap: 36px; }
+    .player { grid-template-columns: 1fr; gap: 28px; }
+    .cover { max-width: 380px; }
+  }
+
+  /* ---- phones and small tablets: full-height screens + bottom tabs ---- */
+  @media (max-width: 860px) {
+    footer { display: none; }
+    .room { display: block; padding: 0; height: calc(100dvh - var(--hdr) - var(--nav) - var(--safe-b)); }
+    .room > section, .room > aside { display: none; height: 100%; }
+    .room[data-tab="player"] .pane-player,
+    .room[data-tab="chat"] .pane-chat,
+    .room[data-tab="next"] .pane-next { display: flex; flex-direction: column; }
+    .pane-player { justify-content: center; padding: 20px var(--gut) 16px; overflow-y: auto; }
+    .player { grid-template-columns: 1fr; gap: clamp(20px, 4dvh, 36px); justify-items: center; }
+    .cover { width: min(100%, 42dvh, 420px); border-radius: 20px; }
+    .np { width: 100%; max-width: 480px; gap: clamp(18px, 3dvh, 28px); }
+    .np .title { font-size: clamp(26px, 7vw, 34px); }
+    .np .artist { font-size: 16.5px; }
+    .ctl .main { flex: 1; }
+    .vol { max-width: 130px; }
+    .pane-next { padding: 24px var(--gut); overflow-y: auto; }
+    .get { display: block; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+    .get p { color: var(--faint); font-size: 13px; margin: 12px 0 14px; }
+    .get .links { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .get .lk { border-color: var(--line); background: var(--s1); min-width: 0; }
+    .chat { position: static; border: 0; border-radius: 0; height: 100%; max-height: none; min-height: 0; background: var(--bg); }
+    .chat-h { padding: 16px var(--gut); }
+    .msgs { padding: 4px var(--gut) 12px; }
+    .compose { padding: 12px var(--gut); }
+    .nav { display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+      height: calc(var(--nav) + var(--safe-b)); padding-bottom: var(--safe-b); background: rgba(0,0,0,.96); border-top: 1px solid var(--line); }
+    .nav button { position: relative; display: grid; justify-items: center; align-content: center; gap: 5px; border: 0; background: none; color: var(--faint); font-size: 11.5px; font-weight: 560; cursor: pointer; }
+    .nav button svg { width: 22px; height: 22px; }
+    .nav button[aria-selected="true"] { color: var(--text); }
+    .nav .badge { position: absolute; top: 12px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px #000; }
+  }
+  @media (max-width: 860px) and (max-height: 640px) { .cover { width: min(100%, 34dvh); } }
 </style>
 </head>
 <body>
 <header>
   <div class="bar">
-    <div class="mark">LastWave <i>Jam</i></div>
-    <div class="meta-bar">
-      <span class="code" id="hdr-code"></span>
-      <span class="live hidden" id="hdr-live"><span id="count">0</span>&nbsp;listening</span>
+    <div class="logo"><span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>LastWave <i>Jam</i></div>
+    <div class="hdr-meta">
+      <span class="pill code" id="hdr-code"></span>
+      <span class="pill hidden" id="hdr-live"><span class="dot"></span><span id="count">0</span></span>
     </div>
   </div>
 </header>
 
 <main id="join-view" class="join">
   <div class="join-card">
-    <div class="label">Invitation</div>
-    <h1>Listen together.</h1>
-    <p class="sub">Join this room straight from your browser. No account needed.</p>
-    <div class="label">Room</div>
-    <div class="code-l" id="code-label"></div>
+    <div class="label">You're invited</div>
+    <h1>Listen together, in sync.</h1>
+    <p class="sub">Join this room from your browser. No app or account needed.</p>
+    <div class="codebox"><div class="label">Room code</div><div class="v" id="code-label"></div></div>
     <form id="join-form">
       <input class="field" id="name" maxlength="32" placeholder="Your name" autocomplete="nickname" required aria-label="Your name">
       <button class="btn solid" type="submit">Listen in browser</button>
     </form>
     <div class="or">or</div>
-    <a class="btn" id="open-app" href="#">Open in LastWave app</a>
+    <a class="btn" id="open-app" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Open in LastWave app</a>
     <div class="msg" id="join-status" role="status"></div>
   </div>
 </main>
 
-<main id="room-view" class="room hidden">
-  <section aria-label="Now playing">
+<main id="room-view" class="room hidden" data-tab="player">
+  <section class="pane-player" aria-label="Now playing">
     <div class="player">
       <div class="cover">
-        <div class="ph" id="art-ph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+        <div class="ph" id="art-ph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
         <img id="cover" alt="" class="hidden">
       </div>
       <div class="np">
@@ -171,39 +233,60 @@
           <div class="times"><span id="t-pos">0:00</span><span id="t-dur">0:00</span></div>
         </div>
         <div class="ctl">
-          <button id="listen" class="btn solid" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg><span id="listen-t">Listen</span></button>
-          <label class="vol" title="Volume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input id="vol" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
+          <button id="listen" class="btn solid main" type="button">
+            <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+            <svg class="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            <svg class="i-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6M21 9l-5 6"/></svg>
+            <span id="listen-t">Listen</span>
+          </button>
+          <label class="vol" title="Volume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input id="vol" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
         </div>
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </div>
     </div>
-    <div class="upnext">
-      <div class="label">Up next</div>
-      <div class="q" id="next"></div>
+  </section>
+
+  <section class="pane-next" aria-label="Up next">
+    <div class="sec-h"><span class="label">Up next</span></div>
+    <div id="next"></div>
+    <div class="get">
+      <div class="label">Get LastWave</div>
+      <p>Browser audio is ~128 kbps. The apps play 24-bit lossless with EQ, and let you host.</p>
+      <div class="links" id="links-m"></div>
     </div>
   </section>
 
-  <aside class="chat" aria-label="Room chat">
+  <aside class="pane-chat chat" aria-label="Room chat">
     <div class="chat-h"><span class="label">Chat</span><span class="c" id="chat-count"></span></div>
-    <div class="msgs" id="chat" aria-live="polite"><div class="empty" id="chat-empty">No messages yet.</div></div>
+    <div class="msgs" id="chat" aria-live="polite">
+      <div class="empty" id="chat-empty"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><div style="margin-top:10px">No messages yet. Say hi.</div></div></div>
+    </div>
     <form class="compose" id="chat-form">
-      <input class="field" id="chat-input" maxlength="500" placeholder="Message" autocomplete="off" aria-label="Message">
-      <button class="btn solid" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <input class="field" id="chat-input" maxlength="500" placeholder="Message the room" autocomplete="off" aria-label="Message">
+      <button class="btn solid" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
   </aside>
 </main>
 
-<footer>
+<nav class="nav hidden" id="nav" role="tablist" aria-label="Room">
+  <button role="tab" data-tab="player" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Playing</button>
+  <button role="tab" data-tab="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Chat<span class="badge hidden" id="badge"></span></button>
+  <button role="tab" data-tab="next" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Up next</button>
+</nav>
+
+<footer id="footer">
   <div class="foot">
-    <span>Browser audio is ~128 kbps. LastWave apps play 24-bit lossless with EQ.</span>
-    <span class="links">
-      <a href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener">Desktop</a>
-      <a href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener">Android</a>
-      <a href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener">Discord</a>
-      <a href="https://t.me/clashprojects" target="_blank" rel="noopener">Telegram</a>
-    </span>
+    <div class="note">Browser audio is ~128 kbps. LastWave apps play 24-bit lossless with EQ, and let you host your own rooms.</div>
+    <div class="links" id="links-d"></div>
   </div>
 </footer>
+
+<template id="links-tpl">
+  <a class="lk" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Desktop</a>
+  <a class="lk" href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>Android</a>
+  <a class="lk" href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.5a14 14 0 0 1 10 0l1.5 2.5c1.5 3 2 6 1.8 9.2-1.6 1.2-3.2 1.9-4.8 2.3l-1-2a11 11 0 0 1-5 0l-1 2c-1.6-.4-3.2-1.1-4.8-2.3-.2-3.2.3-6.2 1.8-9.2z"/><circle cx="9.3" cy="12.5" r="1.2"/><circle cx="14.7" cy="12.5" r="1.2"/></svg>Discord</a>
+  <a class="lk" href="https://t.me/clashprojects" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.5 4-19 7.4 6.3 2.3L18 7.6l-7.2 7.8.2 5.1 3-3.6 4.4 3.3z"/></svg>Telegram</a>
+</template>
 
 <audio id="deck-a" preload="auto"></audio>
 <audio id="deck-b" preload="auto"></audio>
@@ -223,12 +306,13 @@
   var ws = null, me = '', hostId = '', webOn = false, count = 0, chatN = 0;
   var play = { track: null, pos: 0, at: 0, playing: false };
   var queue = [], clockOffset = 0; // server_ms - local_ms
-  var pc = null, dc = null, wantAudio = false, connectTimer = 0, blocked = false;
+  var pc = null, dc = null, wantAudio = false, muted = false, connectTimer = 0, blocked = false;
   var songs = {}, asked = {}, tries = {}, incoming = null, lastByteAt = 0;
   var decks = [mkDeck($('deck-a')), mkDeck($('deck-b'))];
 
   $('code-label').textContent = code || '—';
-  $('hdr-code').textContent = code;
+  $('hdr-code').textContent = code || '—';
+  ['links-d', 'links-m'].forEach(function (id) { $(id).appendChild($('links-tpl').content.cloneNode(true)); });
   // Opens whichever LastWave is installed; Android needs an intent link.
   var enc = encodeURIComponent(code);
   $('open-app').href = /Android/i.test(navigator.userAgent)
@@ -239,11 +323,28 @@
   if (!code) $('join-status').textContent = 'This link has no room code. Ask the host for the full link.';
 
   function status(text, cls) { var s = $('status'); s.textContent = text || ''; s.className = 'status' + (cls ? ' ' + cls : ''); }
-  function listenLabel(t) { $('listen-t').textContent = t; }
+  // Main button: Listen -> Live (tap to mute) -> Muted (tap to unmute); Retry/Try again restart.
+  function listenLabel(t) {
+    var b = $('listen');
+    $('listen-t').textContent = t;
+    b.classList.toggle('live', t === 'Live' || t === 'Muted');
+    b.classList.toggle('muted', t === 'Muted');
+  }
   function send(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, payload: payload })); }
   function signal(data) { if (hostId) send('rtc_signal', { to: hostId, data: data }); }
   function fmt(ms) { if (!isFinite(ms) || ms < 0) ms = 0; var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  /* ---- tabs (phones and small tablets) ---- */
+  function tab() { return $('room-view').dataset.tab; }
+  document.querySelectorAll('.nav button').forEach(function (b) {
+    b.onclick = function () {
+      $('room-view').dataset.tab = b.dataset.tab;
+      document.querySelectorAll('.nav button').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+      if (b.dataset.tab === 'chat') { $('badge').classList.add('hidden'); var c = $('chat'); c.scrollTop = c.scrollHeight; }
+    };
+  });
+  var phone = window.matchMedia('(max-width: 860px)');
 
   /* ---- join / socket ---- */
   $('join-form').onsubmit = function (e) {
@@ -277,8 +378,8 @@
         me = p.user_id; hostId = p.host_id || ''; webOn = !!p.web_guests;
         count = (p.participants || []).length;
         $('join-view').classList.add('hidden'); $('room-view').classList.remove('hidden');
-        $('hdr-live').classList.remove('hidden');
-        (p.chat_history || []).forEach(addChat);
+        $('hdr-live').classList.remove('hidden'); $('nav').classList.remove('hidden');
+        (p.chat_history || []).forEach(function (m) { addChat(m, true); });
         queue = (p.playback || {}).queue || [];
         applyPlayback(p.playback || {}, (p.playback || {}).current_track);
         renderCount(); refreshListenState();
@@ -312,7 +413,7 @@
     }
   }
 
-  function renderCount() { $('count').textContent = count; }
+  function renderCount() { $('count').textContent = count + ' listening'; }
 
   function refreshListenState() {
     var btn = $('listen');
@@ -324,7 +425,7 @@
     }
     btn.disabled = false;
     if (wantAudio && !pc) startListening();
-    else if (!wantAudio) status('Press Listen to hear the room.');
+    else if (!wantAudio) status('Press Listen to join the audio.');
   }
 
   /* ---- now playing ---- */
@@ -361,7 +462,7 @@
   function renderQueue() {
     var box = $('next');
     box.textContent = '';
-    if (!queue.length) { box.appendChild(el('div', 'empty', 'Nothing queued.')); return; }
+    if (!queue.length) { box.appendChild(el('div', 'empty', 'Nothing queued yet.')); return; }
     queue.slice(0, 5).forEach(function (q, i) {
       var row = el('div', 'row');
       row.appendChild(el('span', 'n', String(i + 1).padStart(2, '0')));
@@ -390,7 +491,7 @@
   setInterval(tick, 250);
 
   /* ---- chat ---- */
-  function addChat(m) {
+  function addChat(m, history) {
     var box = $('chat'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
     var empty = $('chat-empty'); if (empty) empty.remove();
     var name = m.user_name || 'Someone', row = el('div', 'm' + (m.user_id === me ? ' me' : ''));
@@ -407,6 +508,8 @@
     while (box.childNodes.length > 200) box.removeChild(box.firstChild);
     chatN++; $('chat-count').textContent = chatN + (chatN === 1 ? ' message' : ' messages');
     if (stick || m.user_id === me) box.scrollTop = box.scrollHeight;
+    // Unread dot on the Chat tab when the message arrives on another screen.
+    if (!history && phone.matches && tab() !== 'chat' && m.user_id !== me) $('badge').classList.remove('hidden');
   }
   $('chat-form').onsubmit = function (e) {
     e.preventDefault();
@@ -426,7 +529,17 @@
   decks.forEach(function (d) { d.el.volume = +$('vol').value; });
 
   $('listen').onclick = function () {
-    wantAudio = true;
+    var label = $('listen-t').textContent;
+    // Once live, the button only mutes locally: the room keeps playing in sync.
+    if (wantAudio && (label === 'Live' || label === 'Muted') && dc && dc.readyState === 'open') {
+      muted = !muted;
+      decks.forEach(function (d) { d.el.muted = muted; });
+      listenLabel(muted ? 'Muted' : 'Live');
+      if (!muted) syncAudio(true);
+      return;
+    }
+    wantAudio = true; muted = false;
+    decks.forEach(function (d) { d.el.muted = false; });
     tries = {}; // a manual press retries songs that gave up
     listenLabel('Live');
     // Unlock both decks inside the tap: iOS Safari only lets an element play
@@ -464,7 +577,7 @@
 
   function failDirect() {
     closePeer();
-    status('Your network blocks a direct connection to the host. Chat still works. Try another network and press Listen again.', 'bad');
+    status('Your network blocks a direct connection to the host. Chat still works. Try another network and press Try again.', 'bad');
     listenLabel('Try again');
   }
 

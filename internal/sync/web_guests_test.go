@@ -71,6 +71,14 @@ func TestWebGuests_GateRelayAndMigration(t *testing.T) {
 		t.Fatal("web guests stayed on after the enabling host left")
 	}
 
+	// Always-on rooms never allow browser guests.
+	perm := NewRoom("INDIA", host, protocol.RoomModeCollaborative)
+	perm.Permanent = true
+	perm.SetWebGuests(host, true)
+	if perm.webGuestsLocked() {
+		t.Fatal("always-on room enabled browser guests")
+	}
+
 	// Browser guests are never promoted, even when they are the only ones left.
 	room.Leave(app)
 	if room.HostID() != "" {

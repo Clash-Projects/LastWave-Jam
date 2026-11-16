@@ -29,9 +29,15 @@ func (r *Room) nextAppHostLocked(newest bool) *Client {
 
 // SetWebGuests lets the main host allow or stop browser guests. Stopping
 // does not kick guests already in the room; they keep chat, lose audio.
+// The always-on rooms (INDIA, WORLD) never offer browser listening.
 func (r *Room) SetWebGuests(c *Client, enabled bool) {
 	r.mu.Lock()
-	if r.Radio || r.host == nil || r.host.ID != c.ID {
+	if r.Radio || r.Permanent {
+		r.mu.Unlock()
+		c.SendError("not_available", "Browser listening isn't available in always-on rooms")
+		return
+	}
+	if r.host == nil || r.host.ID != c.ID {
 		r.mu.Unlock()
 		c.SendError("unauthorized", "Only the main host can change browser listening")
 		return

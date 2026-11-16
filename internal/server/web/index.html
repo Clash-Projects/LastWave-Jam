@@ -546,7 +546,9 @@
           : 'lastwave://jam?code=' + enc;
         var joinBtn = document.getElementById('btn-join-app');
         joinBtn.href = appLink;
-        document.getElementById('btn-listen-web').href = '/listen?code=' + enc;
+        // Always-on rooms have no host streaming to browsers.
+        if (station) document.getElementById('btn-listen-web').classList.add('hidden');
+        else document.getElementById('btn-listen-web').href = '/listen?code=' + enc;
         joinBtn.onclick = function () { showToast('Opening LastWave…'); };
 
         // Try once automatically; if the app is missing nothing happens.

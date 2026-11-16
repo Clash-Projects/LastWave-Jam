@@ -2,92 +2,223 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#000000">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0d">
 <meta name="description" content="Listen to a LastWave Jam room in your browser.">
 <title>LastWave Jam · Listen</title>
 <style>
-  :root { --bg:#000; --card:#111214; --line:#24262b; --text:#f2f3f5; --dim:#9a9ca6; --accent:#7c8cff; --warn:#f5b84d; --bad:#ff6b6b; }
+  :root {
+    --bg: #0b0b0d; --panel: #141417; --panel-2: #1b1b1f; --line: #26262c;
+    --text: #f4f4f6; --dim: #a1a1aa; --faint: #6b6b75;
+    --accent: #8b9bff; --accent-ink: #0b0b0d; --warn: #f5b84d; --bad: #ff7272;
+    --radius: 16px; --pad: 16px;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
-  @media (min-width: 820px) { main { grid-template-columns: 1fr 360px; align-items: start; } .wide { grid-column: 1 / -1; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
-  .row { display: flex; gap: 14px; align-items: center; min-width: 0; }
-  .grow { flex: 1; min-width: 0; }
-  .dim { color: var(--dim); font-size: 13px; }
-  .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  h1 { font-size: 18px; margin: 0; }
-  #cover { width: 96px; height: 96px; border-radius: 10px; background: #1b1c20; object-fit: cover; flex: none; }
-  #title { font-size: 20px; font-weight: 700; }
-  button, .btn { font: inherit; border: 1px solid var(--line); background: #1b1c20; color: var(--text); border-radius: 10px; padding: 10px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
-  button:disabled { opacity: .5; cursor: default; }
-  input { font: inherit; width: 100%; background: #000; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  #status { margin-top: 10px; font-size: 13px; color: var(--dim); }
-  #status.warn { color: var(--warn); } #status.bad { color: var(--bad); }
-  #lyrics { max-height: 320px; overflow-y: auto; }
-  #lyrics p { margin: 6px 0; color: var(--dim); }
-  #lyrics p.on { color: var(--text); font-weight: 700; }
-  #chat { height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  .msg b { font-weight: 600; } .msg .host { color: var(--accent); }
-  .banner { font-size: 13px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
-  .banner .links { display: flex; flex-wrap: wrap; gap: 8px; }
-  .banner .btn { padding: 6px 10px; font-size: 13px; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; background-color: var(--bg);
+    background-image: radial-gradient(1200px 600px at 20% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%);
+    background-attachment: fixed;
+    color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  a { color: inherit; }
   .hidden { display: none !important; }
+  .dim { color: var(--dim); } .faint { color: var(--faint); }
+  .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grow { flex: 1; min-width: 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+
+  /* ---- top bar ---- */
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1320px; margin: 0 auto; padding: 10px var(--pad); display: flex; align-items: center; gap: 10px; }
+  .brand { font-weight: 800; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; color: var(--dim); white-space: nowrap; }
+  .chip b { color: var(--text); font-weight: 600; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; }
+  @media (max-width: 480px) { #room-chip { display: none !important; } }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn:hover { border-color: #3a3a42; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; border-radius: 10px; }
+
+  /* ---- layout: stacked on phones, 2 columns on tablets, 3 on wide screens ---- */
+  main { max-width: 1320px; margin: 0 auto; padding: var(--pad); display: grid; gap: var(--pad); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+  .side { display: flex; flex-direction: column; height: 72vh; height: 72dvh; min-height: 420px; overflow: hidden; }
+  .side > .pane { display: none; flex-direction: column; min-height: 0; flex: 1; }
+  .side > .pane.on { display: flex; }
+  @media (min-width: 900px) {
+    main.room { grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); align-items: start; }
+    .player { position: sticky; top: 72px; }
+    .side { height: calc(100vh - 96px); height: calc(100dvh - 96px); }
+  }
+  @media (min-width: 1240px) {
+    main.room { grid-template-columns: 380px minmax(0, 1fr) 340px; }
+    .side { display: contents; }
+    .side .tabs, .side > .pane[data-pane="next"] { display: none !important; }
+    .side > .pane { display: flex !important; height: calc(100vh - 96px); height: calc(100dvh - 96px);
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  }
+
+  /* ---- join ---- */
+  .join { max-width: 460px; width: 100%; margin: 8vh auto 0; padding: 24px; }
+  .join h1 { margin: 0 0 6px; font-size: 24px; }
+  .code-big { font: 800 28px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 6px; color: var(--accent); margin: 14px 0 18px; overflow-wrap: anywhere; }
+  .field { display: flex; gap: 8px; }
+  .field input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+  .msg-line { min-height: 20px; margin-top: 12px; font-size: 13px; }
+
+  /* ---- player ---- */
+  .player { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .art { position: relative; width: 100%; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: var(--panel-2);
+    box-shadow: 0 18px 50px -24px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .art .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); font-size: 44px; }
+  @media (max-width: 899px) { .art { max-width: 340px; margin: 0 auto; } }
+  .meta .title { font-size: 21px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+  .meta .artist { font-size: 15px; color: var(--dim); margin-top: 2px; }
+  .seek { display: grid; gap: 6px; }
+  .track { position: relative; height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+  .track .buf { position: absolute; inset: 0 auto 0 0; background: #2e2e35; width: 0; }
+  .track .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); width: 0; border-radius: 999px; }
+  .times { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .controls { display: flex; align-items: center; gap: 12px; }
+  .listen { flex: 1; min-height: 48px; font-size: 16px; }
+  .vol { display: flex; align-items: center; gap: 8px; width: 140px; }
+  .vol input { width: 100%; accent-color: var(--accent); }
+  @media (max-width: 380px) { .vol { width: 96px; } }
+  .status { font-size: 13px; color: var(--dim); min-height: 18px; }
+  .status.warn { color: var(--warn); } .status.bad { color: var(--bad); }
+  .note { font-size: 12px; color: var(--faint); border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .note .links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* ---- tabs / panes ---- */
+  .tabs { display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--line); }
+  .tab { flex: 1; min-height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--dim); cursor: pointer; font-weight: 600; }
+  .tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); }
+  .pane-h { padding: 14px 18px 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); display: none; }
+  @media (min-width: 1240px) { .pane-h { display: block; } }
+
+  /* ---- lyrics ---- */
+  .lyrics { position: relative; flex: 1; overflow-y: auto; padding: 18px 22px 40vh; scroll-behavior: smooth; overscroll-behavior: contain; }
+  .lyrics p { margin: 0; padding: 7px 0; font-size: clamp(19px, 2.1vw, 26px); font-weight: 700; line-height: 1.3; color: var(--faint); transition: color .25s; overflow-wrap: anywhere; }
+  .lyrics p.past { color: #4c4c55; }
+  .lyrics p.on { color: var(--text); }
+  .lyrics.plain p { font-size: 17px; font-weight: 500; color: var(--dim); padding: 3px 0; }
+  .lyrics p.empty { font-size: 15px; font-weight: 500; color: var(--faint); }
+  .credit { padding: 8px 22px 12px; font-size: 11px; color: var(--faint); border-top: 1px solid var(--line); }
+
+  /* ---- chat ---- */
+  .chat { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+  .m { display: flex; gap: 10px; align-items: flex-start; }
+  .av { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #0b0b0d; }
+  .m .body { min-width: 0; }
+  .m .who { font-size: 13px; font-weight: 650; }
+  .m .who .host { color: var(--accent); font-size: 11px; margin-left: 6px; }
+  .m .who time { color: var(--faint); font-weight: 400; font-size: 11px; margin-left: 6px; }
+  .m .text { overflow-wrap: anywhere; color: #dedee3; }
+  .m .reply { font-size: 12px; color: var(--faint); border-left: 2px solid var(--line); padding-left: 6px; margin-bottom: 2px; overflow-wrap: anywhere; }
+  .m.mine .who { color: var(--accent); }
+  .chat .empty { margin: auto; color: var(--faint); font-size: 14px; }
+  .compose { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .compose input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+
+  /* ---- up next ---- */
+  .next { padding: 10px; display: grid; gap: 2px; overflow-y: auto; align-content: start; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 10px; }
+  .row img, .row .sq { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: var(--panel-2); flex: none; }
+  .row .t { font-weight: 600; } .row .a { font-size: 13px; color: var(--dim); }
+  .row .ready { font-size: 11px; color: var(--faint); white-space: nowrap; }
+  .next-wide { display: none; }
+  @media (min-width: 1240px) { .next-wide { display: block; } }
+  .next-wide h3 { margin: 4px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); font-weight: 600; }
+  .next-wide .next { padding: 0; }
 </style>
 </head>
 <body>
-<main>
-  <section class="card wide banner" aria-label="About browser listening">
-    <span class="grow" style="min-width:220px">Browser listening is capped at 96–128 kbps. Get LastWave for 24-bit lossless, EQ and hosting your own rooms.</span>
-    <span class="links">
-      <a class="btn" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener">Desktop</a>
-      <a class="btn" href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener">Android</a>
-      <a class="btn" href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener">Discord</a>
-      <a class="btn" href="https://t.me/clashprojects" target="_blank" rel="noopener">Telegram</a>
-    </span>
-  </section>
-
-  <section id="join" class="card wide">
-    <h1>Join room <span id="code-label"></span></h1>
-    <p class="dim">No app or account needed. Pick a name so others can see you in chat.</p>
-    <form id="join-form" class="row">
-      <input id="name" maxlength="32" placeholder="Your name" autocomplete="nickname" required class="grow">
-      <button class="primary" type="submit">Join</button>
-    </form>
-    <div id="join-status" class="dim" style="margin-top:10px"></div>
-  </section>
-
-  <div id="room" class="hidden" style="display:contents">
-    <section class="card">
-      <div class="row">
-        <img id="cover" alt="">
-        <div class="grow">
-          <div id="title" class="ell">Nothing playing yet</div>
-          <div id="artist" class="dim ell"></div>
-          <div class="dim" style="margin-top:4px"><span id="count">0</span> listening · room <span id="code2"></span></div>
-        </div>
-      </div>
-      <div style="margin-top:14px"><button id="listen" class="primary" type="button">Tap to Listen</button></div>
-      <div id="status" role="status" aria-live="polite"></div>
-      <audio id="audio" preload="auto"></audio>
-    </section>
-
-    <section class="card" aria-label="Chat">
-      <div id="chat" aria-live="polite"></div>
-      <form id="chat-form" class="row">
-        <input id="chat-input" maxlength="500" placeholder="Say something" autocomplete="off" class="grow">
-        <button type="submit">Send</button>
-      </form>
-    </section>
-
-    <section class="card">
-      <div class="dim" style="margin-bottom:6px">Lyrics</div>
-      <div id="lyrics"><p>No lyrics yet.</p></div>
-    </section>
+<header>
+  <div class="bar">
+    <div class="brand">LastWave <span>Jam</span></div>
+    <span class="chip hidden" id="room-chip">Room <b id="code-chip"></b></span>
+    <span class="chip hidden" id="count-chip"><span class="dot"></span><b id="count">0</b>&nbsp;listening</span>
+    <span class="grow"></span>
+    <a class="btn small" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener">Get the app</a>
   </div>
+</header>
+
+<main id="join-view">
+  <section class="panel join">
+    <h1>Join the jam</h1>
+    <div class="dim">Listen along in your browser. No app or account needed.</div>
+    <div class="code-big" id="code-label"></div>
+    <form id="join-form" class="field">
+      <input id="name" maxlength="32" placeholder="Your name" autocomplete="nickname" required aria-label="Your name">
+      <button class="btn primary" type="submit">Join</button>
+    </form>
+    <div class="msg-line dim" id="join-status" role="status"></div>
+  </section>
 </main>
+
+<main id="room-view" class="room hidden">
+  <section class="panel player" aria-label="Now playing">
+    <div class="art"><div class="ph" id="art-ph" aria-hidden="true">♪</div><img id="cover" alt="" class="hidden"></div>
+    <div class="meta">
+      <div class="title" id="title">Nothing playing yet</div>
+      <div class="artist ell" id="artist">Waiting for the host to play a song</div>
+    </div>
+    <div class="seek" aria-hidden="true">
+      <div class="track"><div class="buf" id="buf"></div><div class="fill" id="fill"></div></div>
+      <div class="times"><span id="t-pos">0:00</span><span id="t-dur">0:00</span></div>
+    </div>
+    <div class="controls">
+      <button id="listen" class="btn primary listen" type="button">Tap to Listen</button>
+      <label class="vol" title="Volume"><span aria-hidden="true">🔊</span><input id="vol" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div class="next-wide"><h3>Up next</h3><div class="next" id="next-wide"></div></div>
+    <div class="note">
+      <span class="grow" style="min-width:200px">Browser playback is capped at 96–128 kbps. Get LastWave for 24-bit lossless, EQ and hosting.</span>
+      <span class="links">
+        <a class="btn small" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener">Desktop</a>
+        <a class="btn small" href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener">Android</a>
+        <a class="btn small" href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener">Discord</a>
+        <a class="btn small" href="https://t.me/clashprojects" target="_blank" rel="noopener">Telegram</a>
+      </span>
+    </div>
+  </section>
+
+  <section class="panel side">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="lyrics" aria-selected="true">Lyrics</button>
+      <button class="tab" role="tab" data-tab="chat" aria-selected="false">Chat</button>
+      <button class="tab" role="tab" data-tab="next" aria-selected="false">Up next</button>
+    </div>
+    <div class="pane on" data-pane="lyrics">
+      <div class="pane-h">Lyrics</div>
+      <div class="lyrics" id="lyrics"><p class="empty">Lyrics appear here when a song plays.</p></div>
+      <div class="credit">Lyrics from LRCLIB</div>
+    </div>
+    <div class="pane" data-pane="chat">
+      <div class="pane-h">Chat</div>
+      <div class="chat" id="chat" aria-live="polite"><div class="empty" id="chat-empty">No messages yet. Say hi!</div></div>
+      <form class="compose" id="chat-form">
+        <input id="chat-input" maxlength="500" placeholder="Message the room" autocomplete="off" aria-label="Message">
+        <button class="btn primary" type="submit">Send</button>
+      </form>
+    </div>
+    <div class="pane" data-pane="next">
+      <div class="next" id="next"></div>
+    </div>
+  </section>
+</main>
+
+<audio id="deck-a" preload="auto"></audio>
+<audio id="deck-b" preload="auto"></audio>
+
 <script>
 (function () {
   'use strict';
@@ -98,23 +229,40 @@
   var sameOrigin = /(^|\.)clashgram\.org$|^localhost$|^127\./.test(location.hostname);
   var WS_URL = sameOrigin ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws' : 'wss://jam.clashgram.org/ws';
   var ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+  var MAX_TRIES = 3, STALL_MS = 25000;
 
   var ws = null, me = '', hostId = '', webOn = false, count = 0;
-  var pc = null, dc = null, wantAudio = false, connectTimer = 0;
-  var queue = [], songs = {}, asked = {}, incoming = null, loadedId = '', media = null;
   var play = { track: null, pos: 0, at: 0, playing: false };
-  var clockOffset = 0; // server_ms - local_ms
+  var queue = [], clockOffset = 0; // server_ms - local_ms
   var lyrics = [], lyricIdx = -1, lyricsKey = '';
+  // P2P
+  var pc = null, dc = null, wantAudio = false, connectTimer = 0;
+  var songs = {}, asked = {}, tries = {}, incoming = null, lastByteAt = 0;
+  var decks = [mkDeck($('deck-a')), mkDeck($('deck-b'))];
 
   $('code-label').textContent = code;
-  $('code2').textContent = code;
+  $('code-chip').textContent = code;
   try { $('name').value = localStorage.getItem('lw_jam_name') || ''; } catch (e) {}
+  try { var v = parseFloat(localStorage.getItem('lw_jam_vol')); if (v >= 0 && v <= 1) $('vol').value = v; } catch (e) {}
   if (!code) $('join-status').textContent = 'This link has no room code. Ask the host for the full link.';
 
-  function status(text, cls) { var s = $('status'); s.textContent = text; s.className = cls || ''; }
+  function status(text, cls) { var s = $('status'); s.textContent = text || ''; s.className = 'status' + (cls ? ' ' + cls : ''); }
   function send(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, payload: payload })); }
   function signal(data) { if (hostId) send('rtc_signal', { to: hostId, data: data }); }
+  function fmt(ms) { if (!isFinite(ms) || ms < 0) ms = 0; var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 
+  /* ---- tabs (phones and tablets; wide screens show every pane) ---- */
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-selected', String(x === t)); });
+      document.querySelectorAll('.side > .pane').forEach(function (p) { p.classList.toggle('on', p.dataset.pane === t.dataset.tab); });
+      if (t.dataset.tab === 'chat') { var c = $('chat'); c.scrollTop = c.scrollHeight; }
+      if (t.dataset.tab === 'lyrics') { lyricIdx = -2; tick(); }
+    };
+  });
+
+  /* ---- join / socket ---- */
   $('join-form').onsubmit = function (e) {
     e.preventDefault();
     var name = $('name').value.trim();
@@ -129,15 +277,12 @@
     if (ws && ws.readyState === 0) return;
     $('join-status').textContent = 'Connecting…';
     ws = new WebSocket(WS_URL);
-    ws.onopen = function () {
-      send('join_room', { room_code: code, name: name, client_kind: 'web' });
-      send('ping', Date.now());
-    };
+    ws.onopen = function () { send('join_room', { room_code: code, name: name, client_kind: 'web' }); send('ping', Date.now()); };
     ws.onmessage = function (ev) { try { var m = JSON.parse(ev.data); onMessage(m.type, m.payload || {}); } catch (e) {} };
     ws.onclose = function () {
-      closePeer();
+      closePeer(); pauseAll();
       if (me) status('Disconnected from the room. Reload to rejoin.', 'bad');
-      else $('join-status').textContent = $('join-status').textContent === 'Connecting…' ? 'Could not reach the Jam server.' : $('join-status').textContent;
+      else if ($('join-status').textContent === 'Connecting…') $('join-status').textContent = 'Could not reach the Jam server.';
       me = '';
     };
   }
@@ -148,7 +293,8 @@
       case 'sync_state':
         me = p.user_id; hostId = p.host_id || ''; webOn = !!p.web_guests;
         count = (p.participants || []).length;
-        $('join').classList.add('hidden'); $('room').classList.remove('hidden');
+        $('join-view').classList.add('hidden'); $('room-view').classList.remove('hidden');
+        $('room-chip').classList.remove('hidden'); $('count-chip').classList.remove('hidden');
         (p.chat_history || []).forEach(addChat);
         queue = (p.playback || {}).queue || [];
         applyPlayback(p.playback || {}, (p.playback || {}).current_track);
@@ -162,7 +308,7 @@
         break;
       case 'host_changed': case 'cohost_changed':
         var next = p.host_id || p.new_host_id || hostId;
-        if (next !== hostId) { hostId = next; closePeer(); refreshListenState(); }
+        if (next !== hostId) { hostId = next; closePeer(); pauseAll(); refreshListenState(); }
         break;
       case 'web_guests_changed':
         webOn = !!p.enabled;
@@ -171,7 +317,7 @@
         break;
       case 'chat_message': addChat(p); break;
       case 'sync_playback': if (p.queue) queue = p.queue; applyPlayback(p, p.track); break;
-      case 'queue_updated': queue = p.queue || []; requestSongs(); break;
+      case 'queue_updated': queue = p.queue || []; renderQueue(); refreshDecks(); break;
       case 'rtc_signal': if (p.from === hostId) onSignal(p.data || {}); break;
       case 'error':
         if (!me) $('join-status').textContent = p.message || 'Could not join this room.';
@@ -185,53 +331,115 @@
   function refreshListenState() {
     var btn = $('listen');
     if (!webOn || !hostId) {
-      btn.disabled = true; wantAudio = false;
-      status(hostId ? 'The host has turned off browser listening. Chat still works.' : 'Waiting for a host…', 'warn');
+      btn.disabled = true; wantAudio = false; btn.textContent = 'Tap to Listen';
+      pauseAll();
+      status(hostId ? 'The host has turned off browser listening. Chat and lyrics still work.' : 'Waiting for a host…', 'warn');
       return;
     }
     btn.disabled = false;
     if (wantAudio && !pc) startListening();
-    else if (!pc) status('Tap to Listen to hear the host’s stream.');
+    else if (!wantAudio) status('Tap to Listen to hear the room.');
   }
 
-  /* ---- playback, metadata, lyrics ---- */
+  /* ---- now playing ---- */
   function nowServer() { return Date.now() + clockOffset; }
   function positionMs() { return play.playing ? play.pos + (nowServer() - play.at) : play.pos; }
+  function durationMs() {
+    var d = deckFor(play.track && play.track.id);
+    if (d && isFinite(d.el.duration) && d.el.duration > 0) return d.el.duration * 1000;
+    return (play.track && play.track.duration_ms) || 0;
+  }
 
   function applyPlayback(p, track) {
+    var changed = track && (!play.track || play.track.id !== track.id);
     if (track) play.track = track;
     play.pos = p.position_ms || 0; play.at = p.server_time_ms || nowServer(); play.playing = !!p.is_playing;
     var t = play.track;
     $('title').textContent = t ? t.title : 'Nothing playing yet';
-    $('artist').textContent = t ? t.artist : '';
-    var img = $('cover');
-    if (t && t.artwork_url) { if (img.src !== t.artwork_url) img.src = t.artwork_url; img.classList.remove('hidden'); }
-    else img.removeAttribute('src');
+    $('artist').textContent = t ? (t.artist || '') : 'Waiting for the host to play a song';
+    if (changed || !t) setCover(t && t.artwork_url);
     if (t) loadLyrics(t);
-    if (wantAudio) loadCurrent();
+    renderQueue();
+    refreshDecks();
+    tick();
   }
 
+  // Cover art, plus an accent color sampled from it when the image allows CORS.
+  function setCover(url) {
+    var img = $('cover');
+    if (!url) { img.classList.add('hidden'); $('art-ph').classList.remove('hidden'); return; }
+    var probe = new Image();
+    probe.crossOrigin = 'anonymous';
+    probe.onload = function () {
+      try {
+        var c = document.createElement('canvas'); c.width = c.height = 8;
+        var g = c.getContext('2d'); g.drawImage(probe, 0, 0, 8, 8);
+        var d = g.getImageData(0, 0, 8, 8).data, r = 0, gg = 0, b = 0, n = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          var mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+          if (mx - mn > 25 && mx > 60) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
+        }
+        if (n) setAccent(r / n, gg / n, b / n);
+      } catch (e) {}
+    };
+    probe.src = url;
+    img.onload = function () { img.classList.remove('hidden'); $('art-ph').classList.add('hidden'); };
+    img.onerror = function () { img.classList.add('hidden'); $('art-ph').classList.remove('hidden'); };
+    img.src = url;
+  }
+  function setAccent(r, g, b) {
+    // Lift dark covers so the accent stays readable on black.
+    var mx = Math.max(r, g, b), k = mx < 170 ? 170 / Math.max(mx, 1) : 1;
+    r = Math.min(255, r * k); g = Math.min(255, g * k); b = Math.min(255, b * k);
+    document.documentElement.style.setProperty('--accent', 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')');
+  }
+
+  function renderQueue() {
+    [$('next'), $('next-wide')].forEach(function (box) {
+      box.textContent = '';
+      if (!queue.length) { var e = el('div', 'faint', 'Nothing queued yet.'); e.style.padding = '8px'; box.appendChild(e); return; }
+      queue.slice(0, 5).forEach(function (q, i) {
+        var row = el('div', 'row');
+        if (q.artwork_url) { var im = el('img'); im.src = q.artwork_url; im.alt = ''; im.loading = 'lazy'; row.appendChild(im); } else row.appendChild(el('div', 'sq'));
+        var txt = el('div', 'grow'); txt.appendChild(el('div', 't ell', q.title)); txt.appendChild(el('div', 'a ell', q.artist || ''));
+        row.appendChild(txt);
+        if (i === 0 && wantAudio && songs[q.id] && songs[q.id].done) row.appendChild(el('span', 'ready', 'Ready'));
+        box.appendChild(row);
+      });
+    });
+  }
+
+  /* ---- lyrics ---- */
   function loadLyrics(t) {
     var key = t.artist + '\u0000' + t.title;
     if (key === lyricsKey) return;
     lyricsKey = key; lyrics = []; lyricIdx = -1;
-    $('lyrics').innerHTML = '<p>Looking for lyrics…</p>';
-    var q = 'artist_name=' + encodeURIComponent(t.artist) + '&track_name=' + encodeURIComponent(t.title);
-    if (t.duration_ms) q += '&duration=' + Math.round(t.duration_ms / 1000);
-    fetch('https://lrclib.net/api/get?' + q)
+    var box = $('lyrics'); box.className = 'lyrics'; box.innerHTML = '<p class="empty">Looking for lyrics…</p>';
+    var base = 'artist_name=' + encodeURIComponent(t.artist || '') + '&track_name=' + encodeURIComponent(t.title || '');
+    var exact = base + (t.duration_ms ? '&duration=' + Math.round(t.duration_ms / 1000) : '');
+    fetch('https://lrclib.net/api/get?' + exact)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if (key !== lyricsKey) return;
-        lyrics = parseLrc(d && d.syncedLyrics);
-        var box = $('lyrics'); box.textContent = '';
-        if (!lyrics.length) {
-          var plain = d && d.plainLyrics;
-          (plain ? plain.split('\n') : ['No synced lyrics for this song.']).forEach(function (l) { var el = document.createElement('p'); el.textContent = l; box.appendChild(el); });
-          return;
-        }
-        lyrics.forEach(function (l) { var el = document.createElement('p'); el.textContent = l.text || '♪'; l.el = el; box.appendChild(el); });
+        if (d && (d.syncedLyrics || d.plainLyrics)) return d;
+        // Fall back to a search: titles often differ slightly ("Remastered", "feat.").
+        return fetch('https://lrclib.net/api/search?' + base).then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (list) { list = list || []; return list.filter(function (x) { return x.syncedLyrics; })[0] || list[0] || null; });
       })
-      .catch(function () { if (key === lyricsKey) $('lyrics').innerHTML = '<p>Lyrics unavailable.</p>'; });
+      .then(function (d) { if (key === lyricsKey) renderLyrics(d); })
+      .catch(function () { if (key === lyricsKey) renderLyrics(null); });
+  }
+
+  function renderLyrics(d) {
+    var box = $('lyrics'); box.textContent = ''; box.scrollTop = 0;
+    lyrics = parseLrc(d && d.syncedLyrics);
+    if (lyrics.length) {
+      lyrics.forEach(function (l) { l.el = el('p', '', l.text || '♪'); box.appendChild(l.el); });
+      lyricIdx = -2; tick();
+      return;
+    }
+    box.className = 'lyrics plain';
+    if (d && d.plainLyrics) d.plainLyrics.split('\n').forEach(function (l) { box.appendChild(el('p', '', l || ' ')); });
+    else box.appendChild(el('p', 'empty', d && d.instrumental ? 'Instrumental' : 'No lyrics found for this song.'));
   }
 
   function parseLrc(text) {
@@ -243,32 +451,47 @@
     return out.sort(function (a, b) { return a.t - b.t; });
   }
 
-  // 4 Hz is plenty for line-level lyrics and keeps CPU near idle.
-  setInterval(function () {
-    if (!lyrics.length) return;
-    var pos = positionMs(), i = -1;
-    while (i + 1 < lyrics.length && lyrics[i + 1].t <= pos) i++;
-    if (i === lyricIdx) return;
-    if (lyricIdx >= 0) lyrics[lyricIdx].el.classList.remove('on');
-    lyricIdx = i;
-    if (i >= 0) {
-      var el = lyrics[i].el, box = $('lyrics');
-      el.classList.add('on');
-      box.scrollTop = el.offsetTop - box.offsetTop - box.clientHeight / 2 + el.clientHeight / 2;
+  // One 4 Hz tick drives the seekbar and the lyric highlight: cheap on CPU.
+  function tick() {
+    var pos = positionMs(), dur = durationMs();
+    if (play.track) {
+      if (dur) pos = Math.min(pos, dur);
+      $('fill').style.width = (dur ? pos * 100 / dur : 0) + '%';
+      $('t-pos').textContent = fmt(pos); $('t-dur').textContent = fmt(dur);
+      var s = songs[play.track.id];
+      $('buf').style.width = (s && wantAudio ? Math.min(100, s.got * 100 / s.size) : 0) + '%';
+    } else {
+      $('fill').style.width = $('buf').style.width = '0';
+      $('t-pos').textContent = $('t-dur').textContent = '0:00';
     }
-  }, 250);
+    if (!lyrics.length) return;
+    var i = -1;
+    while (i + 1 < lyrics.length && lyrics[i + 1].t <= pos + 150) i++;
+    if (i === lyricIdx) return;
+    lyrics.forEach(function (l, k) { l.el.className = k < i ? 'past' : k === i ? 'on' : ''; });
+    lyricIdx = i;
+    var box = $('lyrics');
+    box.scrollTop = Math.max(0, lyrics[Math.max(i, 0)].el.offsetTop - box.clientHeight * 0.35);
+  }
+  setInterval(tick, 250);
 
   /* ---- chat ---- */
+  var palette = ['#8b9bff', '#ff9bb3', '#7be0b4', '#ffd36e', '#9ad7ff', '#d3a4ff', '#ffb27a'];
+  function colorFor(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return palette[Math.abs(h) % palette.length]; }
   function addChat(m) {
-    var box = $('chat'), row = document.createElement('div'), who = document.createElement('b'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-    row.className = 'msg';
-    who.textContent = (m.user_name || 'Someone') + ': ';
-    if (m.is_host) who.className = 'host';
-    row.appendChild(who);
-    row.appendChild(document.createTextNode(m.text || ''));
-    box.appendChild(row);
-    while (box.childNodes.length > 150) box.removeChild(box.firstChild);
-    if (stick) box.scrollTop = box.scrollHeight;
+    var box = $('chat'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+    var empty = $('chat-empty'); if (empty) empty.remove();
+    var name = m.user_name || 'Someone', row = el('div', 'm' + (m.user_id === me ? ' mine' : ''));
+    var av = el('div', 'av', name.charAt(0).toUpperCase()); av.style.background = colorFor(name);
+    var body = el('div', 'body'), who = el('div', 'who', name);
+    if (m.is_host) who.appendChild(el('span', 'host', 'HOST'));
+    if (m.timestamp) who.appendChild(el('time', '', new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+    body.appendChild(who);
+    if (m.reply_to) body.appendChild(el('div', 'reply', (m.reply_to.user_name || '') + ': ' + (m.reply_to.text || '')));
+    body.appendChild(el('div', 'text', m.text || ''));
+    row.appendChild(av); row.appendChild(body); box.appendChild(row);
+    while (box.childNodes.length > 200) box.removeChild(box.firstChild);
+    if (stick || m.user_id === me) box.scrollTop = box.scrollHeight;
   }
   $('chat-form').onsubmit = function (e) {
     e.preventDefault();
@@ -279,13 +502,22 @@
 
   /* ---- P2P song files (receive-only data channel: no mic, camera or prompts) ----
      The host sends the YouTube version (~128 kbps) of the current and next song
-     straight from its app; this page plays it on the room clock like the apps do. */
-  var audio = $('audio');
+     in 512 KB ranges straight from its app. Two decks: the next song buffers in
+     the idle deck, so the switch at a track change is instant. */
+  $('vol').oninput = function () {
+    decks.forEach(function (d) { d.el.volume = +$('vol').value; });
+    try { localStorage.setItem('lw_jam_vol', $('vol').value); } catch (e) {}
+  };
+  decks.forEach(function (d) { d.el.volume = +$('vol').value; });
+
   $('listen').onclick = function () {
     wantAudio = true;
-    // Unlock playback inside the tap so later songs start without a prompt.
-    if (loadedId) syncAudio(true); else audio.play().catch(function () {});
-    if (!dc || dc.readyState !== 'open') startListening(); else loadCurrent();
+    tries = {}; // a manual tap retries songs that gave up
+    $('listen').textContent = 'Listening';
+    // Unlock both decks inside the tap so later songs start without a prompt.
+    decks.forEach(function (d) { if (!d.id) d.el.play().catch(function () {}); });
+    if (!dc || dc.readyState !== 'open') startListening(); else refreshDecks();
+    syncAudio(true);
   };
 
   function startListening() {
@@ -293,14 +525,15 @@
     if (!webOn || !hostId) return refreshListenState();
     if (!window.RTCPeerConnection) return status('This browser can’t connect to the host. Try a recent Chrome, Edge, Firefox or Safari.', 'bad');
     status('Connecting to the host…');
-    $('listen').disabled = true;
     pc = new RTCPeerConnection({ iceServers: ICE });
     var mine = pc;
     pc.ondatachannel = function (ev) {
       dc = ev.channel;
       dc.binaryType = 'arraybuffer';
-      dc.onopen = function () { clearTimeout(connectTimer); loadCurrent(); };
+      dc.onopen = function () { clearTimeout(connectTimer); status('Connected · loading song…'); refreshDecks(); };
       dc.onmessage = onData;
+      // The host dropped the channel (app restart, network blip): reconnect.
+      dc.onclose = function () { if (pc === mine && wantAudio) setTimeout(function () { if (pc === mine) startListening(); }, 1500); };
     };
     pc.onconnectionstatechange = function () {
       if (pc !== mine) return;
@@ -316,15 +549,20 @@
   function failDirect() {
     closePeer();
     status('Your network blocks a direct connection to the host, so audio can’t play here. Chat and lyrics still work. Try another network (e.g. mobile data) and tap again.', 'bad');
+    $('listen').textContent = 'Try again';
   }
 
   function closePeer() {
     clearTimeout(connectTimer);
-    if (pc) { try { pc.close(); } catch (e) {} pc = null; }
-    dc = null; incoming = null; asked = {};
+    var old = pc; pc = null; dc = null;
+    if (old) { try { old.close(); } catch (e) {} }
+    incoming = null; asked = {};
     // Half-received songs can't resume on a new connection.
-    Object.keys(songs).forEach(function (id) { if (!songs[id].done) { delete songs[id]; if (id === loadedId) { loadedId = ''; media = null; } } });
-    audio.pause();
+    Object.keys(songs).forEach(function (id) {
+      if (songs[id].done) return;
+      delete songs[id];
+      decks.forEach(function (d) { if (d.id === id) resetDeck(d); });
+    });
     $('listen').disabled = !webOn || !hostId;
   }
 
@@ -338,8 +576,9 @@
         .then(function () { if (pc === mine) signal({ kind: 'answer', sdp: mine.localDescription.sdp }); })
         .catch(function () { if (pc === mine) failDirect(); });
     } else if (d.kind === 'bye') {
-      closePeer();
+      wantAudio = false; closePeer(); pauseAll();
       status(d.reason === 'busy' ? 'The host’s stream is full right now. Try again in a bit.' : 'The host stopped the stream.', 'warn');
+      $('listen').textContent = 'Tap to Listen';
     }
   }
 
@@ -352,103 +591,175 @@
     });
   }
 
-  // Current song first, then the next one so track changes start instantly.
+  // Current song first, then the next one, so the track change is seamless.
+  function wanted() { return [play.track && play.track.id, queue[0] && queue[0].id].filter(Boolean); }
   function requestSongs() {
-    if (!dc || dc.readyState !== 'open') return;
-    [play.track && play.track.id, queue[0] && queue[0].id].forEach(function (id) {
-      if (id && !songs[id] && !asked[id]) { asked[id] = true; dc.send(JSON.stringify({ kind: 'get', id: id })); }
+    if (!wantAudio || !dc || dc.readyState !== 'open') return;
+    wanted().forEach(function (id) {
+      if (songs[id] || asked[id] || (tries[id] || 0) >= MAX_TRIES) return;
+      asked[id] = Date.now();
+      dc.send(JSON.stringify({ kind: 'get', id: id }));
     });
   }
 
   function onData(ev) {
     if (typeof ev.data !== 'string') {
       if (!incoming) return;
+      lastByteAt = Date.now();
       incoming.parts.push(ev.data);
       incoming.got += ev.data.byteLength;
-      if (incoming.id === loadedId) pump();
-      else if (play.track && incoming.id === play.track.id) loadCurrent();
+      var id = incoming.id;
+      decks.forEach(function (d) { if (d.id === id) pump(d); });
+      if (incoming.parts.length === 1) refreshDecks();
       return;
     }
     var m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.kind === 'file') {
       incoming = songs[m.id] = { id: m.id, mime: m.mime || 'audio/mp4', size: m.size || 1, got: 0, parts: [], done: false };
-      // Keep only the current and next song in memory.
+      lastByteAt = Date.now();
+      // Keep only songs the room still needs in memory.
+      var keep = wanted();
       Object.keys(songs).forEach(function (id) {
-        if (id !== m.id && id !== loadedId && !(play.track && play.track.id === id) && !(queue[0] && queue[0].id === id)) delete songs[id];
+        if (id !== m.id && keep.indexOf(id) < 0 && !decks.some(function (d) { return d.id === id; })) delete songs[id];
       });
-      if (play.track && m.id === play.track.id) loadCurrent();
     } else if (m.kind === 'end' && songs[m.id]) {
       songs[m.id].done = true;
       if (incoming && incoming.id === m.id) incoming = null;
-      if (m.id === loadedId) pump(); else loadCurrent();
+      decks.forEach(function (d) { if (d.id === m.id) pump(d); });
+      renderQueue(); refreshDecks();
     } else if (m.kind === 'missing') {
-      delete songs[m.id];
-      if (incoming && incoming.id === m.id) incoming = null;
-      if (play.track && m.id === play.track.id) status('This song can’t be streamed to the browser. Chat and lyrics still work.', 'warn');
+      if (m.reason === 'no_youtube') noStream(m.id); else songFailed(m.id);
     }
   }
 
+  // Local or lossless-only song: nothing to stream, so say so and wait for the next one.
+  function noStream(id) {
+    delete songs[id]; asked[id] = false; tries[id] = MAX_TRIES;
+    if (incoming && incoming.id === id) incoming = null;
+    if (play.track && id === play.track.id) status('This song is only on the host’s device, so it can’t play in the browser. Lyrics and chat still work, and the next song will.', 'warn');
+  }
+
+  // A song the host couldn't send: retry with backoff, then tell the listener.
+  function songFailed(id) {
+    delete songs[id]; asked[id] = false;
+    if (incoming && incoming.id === id) incoming = null;
+    decks.forEach(function (d) { if (d.id === id) resetDeck(d); });
+    tries[id] = (tries[id] || 0) + 1;
+    if (tries[id] < MAX_TRIES) { setTimeout(refreshDecks, 2500 * tries[id]); return; }
+    if (play.track && id === play.track.id) {
+      status('This song couldn’t be streamed to the browser. Chat and lyrics still work. Tap Retry to try again.', 'warn');
+      $('listen').textContent = 'Retry';
+    }
+  }
+
+  // Watchdogs: a request the host never answers is retried, and a transfer
+  // that stops mid-song reconnects, so no song sits on "Loading" forever.
+  setInterval(function () {
+    var now = Date.now();
+    Object.keys(asked).forEach(function (id) {
+      if (asked[id] && !songs[id] && now - asked[id] > STALL_MS) songFailed(id);
+    });
+    if (incoming && wantAudio && now - lastByteAt > STALL_MS) {
+      status('Transfer stalled, reconnecting…', 'warn');
+      startListening();
+    }
+  }, 5000);
+
+  /* ---- decks ---- */
   var MS = window.ManagedMediaSource || window.MediaSource;
   function mseType(mime) {
     if (/codecs=/.test(mime)) return mime;
     return /webm/.test(mime) ? 'audio/webm; codecs="opus"' : 'audio/mp4; codecs="mp4a.40.2"';
   }
-
-  // Starts the current song as soon as its first 512 KB range arrives (MSE).
-  // Browsers without MSE wait for the whole file and play it as a blob.
-  function loadCurrent() {
-    requestSongs();
-    var t = play.track;
-    if (!wantAudio || !t) return;
-    var song = songs[t.id];
-    if (!song || !song.parts.length) { if (dc && dc.readyState === 'open') status('Loading song…'); return; }
-    if (loadedId === t.id) return syncAudio(true);
-    var type = mseType(song.mime);
-    if (MS && MS.isTypeSupported(type)) {
-      loadedId = t.id;
-      var ms = new MS(), mine = { ms: ms, sb: null, appended: 0, song: song };
-      media = mine;
-      audio.disableRemotePlayback = true; // required by ManagedMediaSource (iOS)
-      audio.src = URL.createObjectURL(ms);
-      ms.addEventListener('sourceopen', function () {
-        if (media !== mine) return;
-        try { mine.sb = ms.addSourceBuffer(type); } catch (e) { media = null; loadedId = ''; return status('This browser can’t play this song format.', 'bad'); }
-        mine.sb.addEventListener('updateend', pump);
-        pump();
-      });
-    } else if (song.done) {
-      loadedId = t.id; media = null;
-      audio.src = URL.createObjectURL(new Blob(song.parts, { type: song.mime }));
-    } else {
-      status('Loading song ' + Math.min(99, Math.round(song.got * 100 / song.size)) + '%…');
-    }
+  function mkDeck(audio) {
+    var d = { el: audio, id: '', media: null, url: '' };
+    audio.disableRemotePlayback = true; // required by ManagedMediaSource (iOS)
+    audio.addEventListener('loadedmetadata', function () { if (play.track && d.id === play.track.id) syncAudio(true); });
+    audio.addEventListener('waiting', function () { if (wantAudio && play.track && d.id === play.track.id) status('Buffering…'); });
+    audio.addEventListener('playing', function () { if (play.track && d.id === play.track.id) status('Listening live · synced with the room · ~128 kbps'); });
+    return d;
+  }
+  function deckFor(id) { return id ? decks.filter(function (d) { return d.id === id; })[0] : null; }
+  function resetDeck(d) {
+    d.el.pause(); d.el.removeAttribute('src'); d.el.load();
+    if (d.url) URL.revokeObjectURL(d.url);
+    d.id = ''; d.media = null; d.url = '';
   }
 
-  function pump() {
-    var m = media;
+  // Loads a song into a deck as soon as its first range arrives (MSE), or once
+  // complete on browsers without MSE. Returns false when it can't load yet.
+  function loadDeck(d, song) {
+    var type = mseType(song.mime);
+    if (MS && MS.isTypeSupported(type)) {
+      if (!song.parts.length) return false;
+      resetDeck(d);
+      var ms = new MS(), media = { ms: ms, sb: null, appended: 0, song: song };
+      d.id = song.id; d.media = media; d.url = URL.createObjectURL(ms);
+      d.el.src = d.url;
+      ms.addEventListener('sourceopen', function () {
+        if (d.media !== media) return;
+        try { media.sb = ms.addSourceBuffer(type); } catch (e) { resetDeck(d); status('This browser can’t play this song format.', 'bad'); return; }
+        media.sb.addEventListener('updateend', function () { pump(d); });
+        media.sb.addEventListener('error', function () { if (d.media === media) songFailed(song.id); });
+        pump(d);
+      });
+      return true;
+    }
+    if (!song.done) return false;
+    resetDeck(d);
+    d.id = song.id; d.url = URL.createObjectURL(new Blob(song.parts, { type: song.mime }));
+    d.el.src = d.url;
+    return true;
+  }
+
+  function pump(d) {
+    var m = d.media;
     if (!m || !m.sb || m.sb.updating || m.ms.readyState !== 'open') return;
     if (m.appended < m.song.parts.length) {
-      try { m.sb.appendBuffer(m.song.parts[m.appended++]); } catch (e) {}
+      try { m.sb.appendBuffer(m.song.parts[m.appended++]); } catch (e) { m.appended--; }
     } else if (m.song.done) {
       try { m.ms.endOfStream(); } catch (e) {}
     }
   }
 
+  // Keep the current song in one deck and the next one buffering in the other.
+  function refreshDecks() {
+    requestSongs();
+    if (!wantAudio) return;
+    var cur = play.track && play.track.id, nxt = queue[0] && queue[0].id;
+    if (cur && !deckFor(cur) && songs[cur]) {
+      var free = decks.filter(function (d) { return d.id !== nxt; })[0] || decks[0];
+      loadDeck(free, songs[cur]);
+    }
+    if (nxt && nxt !== cur && !deckFor(nxt) && songs[nxt]) {
+      var idle = decks.filter(function (d) { return d.id !== cur; })[0];
+      if (idle) loadDeck(idle, songs[nxt]);
+    }
+    if (cur && !deckFor(cur) && dc && dc.readyState === 'open' && !(tries[cur] >= MAX_TRIES)) status('Loading song…');
+    syncAudio(false);
+  }
+
+  function pauseAll() { decks.forEach(function (d) { if (!d.el.paused) d.el.pause(); }); }
+
   // Follow the room clock: correct drift over 400 ms, mirror play/pause.
   function syncAudio(force) {
-    if (!wantAudio || !play.track || loadedId !== play.track.id || audio.readyState < 1) return;
+    var d = deckFor(play.track && play.track.id);
+    decks.forEach(function (x) { if (x !== d && !x.el.paused) x.el.pause(); });
+    if (!wantAudio || !d || d.el.readyState < 1) return;
     var want = positionMs() / 1000;
-    if (isFinite(audio.duration)) want = Math.min(want, audio.duration);
-    if (force || Math.abs(audio.currentTime - want) > 0.4) { try { audio.currentTime = want; } catch (e) {} }
-    if (play.playing && audio.paused) {
-      audio.play().then(function () { status('Listening live · synced with the room · ~128 kbps'); })
-        .catch(function () { status('Tap to Listen again to start audio.', 'warn'); $('listen').disabled = false; });
-    } else if (!play.playing && !audio.paused) audio.pause();
-    if (!play.playing) status('Paused by the room.');
+    if (isFinite(d.el.duration)) want = Math.min(want, d.el.duration);
+    if (force || Math.abs(d.el.currentTime - want) > 0.4) { try { d.el.currentTime = want; } catch (e) {} }
+    if (play.playing && d.el.paused) {
+      d.el.play().catch(function () { status('Tap to Listen again to start audio.', 'warn'); $('listen').textContent = 'Tap to Listen'; });
+    } else if (!play.playing) {
+      if (!d.el.paused) d.el.pause();
+      status('Paused by the room.');
+    }
   }
-  audio.addEventListener('loadedmetadata', function () { syncAudio(true); });
   setInterval(function () { syncAudio(false); }, 2000);
+
+  renderQueue();
 })();
 </script>
 </body>

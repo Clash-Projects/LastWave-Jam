@@ -101,7 +101,7 @@
 
   var ws = null, me = '', hostId = '', webOn = false, count = 0;
   var pc = null, dc = null, wantAudio = false, connectTimer = 0;
-  var queue = [], files = {}, asked = {}, incoming = null, loadedId = '';
+  var queue = [], songs = {}, asked = {}, incoming = null, loadedId = '', media = null;
   var play = { track: null, pos: 0, at: 0, playing: false };
   var clockOffset = 0; // server_ms - local_ms
   var lyrics = [], lyricIdx = -1, lyricsKey = '';
@@ -322,6 +322,8 @@
     clearTimeout(connectTimer);
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
     dc = null; incoming = null; asked = {};
+    // Half-received songs can't resume on a new connection.
+    Object.keys(songs).forEach(function (id) { if (!songs[id].done) { delete songs[id]; if (id === loadedId) { loadedId = ''; media = null; } } });
     audio.pause();
     $('listen').disabled = !webOn || !hostId;
   }
@@ -354,7 +356,7 @@
   function requestSongs() {
     if (!dc || dc.readyState !== 'open') return;
     [play.track && play.track.id, queue[0] && queue[0].id].forEach(function (id) {
-      if (id && !files[id] && !asked[id]) { asked[id] = true; dc.send(JSON.stringify({ kind: 'get', id: id })); }
+      if (id && !songs[id] && !asked[id]) { asked[id] = true; dc.send(JSON.stringify({ kind: 'get', id: id })); }
     });
   }
 
@@ -363,41 +365,82 @@
       if (!incoming) return;
       incoming.parts.push(ev.data);
       incoming.got += ev.data.byteLength;
-      if (play.track && incoming.id === play.track.id && wantAudio) status('Loading song ' + Math.min(99, Math.round(incoming.got * 100 / incoming.size)) + '%…');
+      if (incoming.id === loadedId) pump();
+      else if (play.track && incoming.id === play.track.id) loadCurrent();
       return;
     }
     var m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.kind === 'file') incoming = { id: m.id, size: m.size || 1, got: 0, parts: [] };
-    else if (m.kind === 'end' && incoming && incoming.id === m.id) {
-      files[m.id] = URL.createObjectURL(new Blob(incoming.parts, { type: 'audio/mp4' }));
-      incoming = null;
+    if (m.kind === 'file') {
+      incoming = songs[m.id] = { id: m.id, mime: m.mime || 'audio/mp4', size: m.size || 1, got: 0, parts: [], done: false };
       // Keep only the current and next song in memory.
-      Object.keys(files).forEach(function (id) {
-        if (id !== m.id && id !== loadedId && !(play.track && play.track.id === id) && !(queue[0] && queue[0].id === id)) { URL.revokeObjectURL(files[id]); delete files[id]; }
+      Object.keys(songs).forEach(function (id) {
+        if (id !== m.id && id !== loadedId && !(play.track && play.track.id === id) && !(queue[0] && queue[0].id === id)) delete songs[id];
       });
-      loadCurrent();
-    } else if (m.kind === 'missing' && play.track && m.id === play.track.id) {
-      status('This song can’t be streamed to the browser. Chat and lyrics still work.', 'warn');
+      if (play.track && m.id === play.track.id) loadCurrent();
+    } else if (m.kind === 'end' && songs[m.id]) {
+      songs[m.id].done = true;
+      if (incoming && incoming.id === m.id) incoming = null;
+      if (m.id === loadedId) pump(); else loadCurrent();
+    } else if (m.kind === 'missing') {
+      delete songs[m.id];
+      if (incoming && incoming.id === m.id) incoming = null;
+      if (play.track && m.id === play.track.id) status('This song can’t be streamed to the browser. Chat and lyrics still work.', 'warn');
     }
   }
 
-  // shortcut: plays after the whole file (~4 MB) arrives; switch to MSE if start delay hurts.
+  var MS = window.ManagedMediaSource || window.MediaSource;
+  function mseType(mime) {
+    if (/codecs=/.test(mime)) return mime;
+    return /webm/.test(mime) ? 'audio/webm; codecs="opus"' : 'audio/mp4; codecs="mp4a.40.2"';
+  }
+
+  // Starts the current song as soon as its first 512 KB range arrives (MSE).
+  // Browsers without MSE wait for the whole file and play it as a blob.
   function loadCurrent() {
     requestSongs();
     var t = play.track;
     if (!wantAudio || !t) return;
-    var url = files[t.id];
-    if (!url) { if (dc && dc.readyState === 'open' && !incoming) status('Loading song…'); return; }
-    if (loadedId !== t.id) { loadedId = t.id; audio.src = url; return; } // syncs on loadedmetadata
-    syncAudio(true);
+    var song = songs[t.id];
+    if (!song || !song.parts.length) { if (dc && dc.readyState === 'open') status('Loading song…'); return; }
+    if (loadedId === t.id) return syncAudio(true);
+    var type = mseType(song.mime);
+    if (MS && MS.isTypeSupported(type)) {
+      loadedId = t.id;
+      var ms = new MS(), mine = { ms: ms, sb: null, appended: 0, song: song };
+      media = mine;
+      audio.disableRemotePlayback = true; // required by ManagedMediaSource (iOS)
+      audio.src = URL.createObjectURL(ms);
+      ms.addEventListener('sourceopen', function () {
+        if (media !== mine) return;
+        try { mine.sb = ms.addSourceBuffer(type); } catch (e) { media = null; loadedId = ''; return status('This browser can’t play this song format.', 'bad'); }
+        mine.sb.addEventListener('updateend', pump);
+        pump();
+      });
+    } else if (song.done) {
+      loadedId = t.id; media = null;
+      audio.src = URL.createObjectURL(new Blob(song.parts, { type: song.mime }));
+    } else {
+      status('Loading song ' + Math.min(99, Math.round(song.got * 100 / song.size)) + '%…');
+    }
+  }
+
+  function pump() {
+    var m = media;
+    if (!m || !m.sb || m.sb.updating || m.ms.readyState !== 'open') return;
+    if (m.appended < m.song.parts.length) {
+      try { m.sb.appendBuffer(m.song.parts[m.appended++]); } catch (e) {}
+    } else if (m.song.done) {
+      try { m.ms.endOfStream(); } catch (e) {}
+    }
   }
 
   // Follow the room clock: correct drift over 400 ms, mirror play/pause.
   function syncAudio(force) {
-    if (!wantAudio || !play.track || loadedId !== play.track.id || !audio.duration) return;
+    if (!wantAudio || !play.track || loadedId !== play.track.id || audio.readyState < 1) return;
     var want = positionMs() / 1000;
-    if (force || Math.abs(audio.currentTime - want) > 0.4) { try { audio.currentTime = Math.min(want, audio.duration); } catch (e) {} }
+    if (isFinite(audio.duration)) want = Math.min(want, audio.duration);
+    if (force || Math.abs(audio.currentTime - want) > 0.4) { try { audio.currentTime = want; } catch (e) {} }
     if (play.playing && audio.paused) {
       audio.play().then(function () { status('Listening live · synced with the room · ~128 kbps'); })
         .catch(function () { status('Tap to Listen again to start audio.', 'warn'); $('listen').disabled = false; });

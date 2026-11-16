@@ -66,10 +66,10 @@ func TestIndexInjectsPreviewMeta(t *testing.T) {
 	mux.ServeHTTP(rec, httptest.NewRequest("GET", "/?code=wave01", nil))
 	body := rec.Body.String()
 	for _, want := range []string{
-		`og:image" content="https://jam.clashprojects.qd.je/og/WAVE01.png"`,
+		`og:image" content="https://jam.clashgram.org/og/WAVE01.png"`,
 		`og:title" content="Join room WAVE01 on LastWave Jam"`,
 		`twitter:card" content="summary_large_image"`,
-		`og:url" content="https://jam.clashprojects.qd.je/?code=WAVE01"`,
+		`og:url" content="https://jam.clashgram.org/?code=WAVE01"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %s", want)

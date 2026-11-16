@@ -402,6 +402,7 @@
           </a>
           <button id="btn-copy-link" type="button" class="btn btn-ghost">Copy link</button>
         </div>
+        <a id="btn-listen-web" href="/listen" class="btn btn-ghost btn-block" style="margin-top:10px">No app? Listen in your browser</a>
 
         <div class="center"><a class="back" href="/"><span aria-hidden="true">←</span> All rooms</a></div>
       </section>
@@ -439,7 +440,7 @@
         { code: 'INDIA', name: 'India', icon: '🪔', blurb: 'Always-on room for India' },
         { code: 'WORLD', name: 'International', icon: '🌍', blurb: 'Always-on room for everyone' }
       ];
-      var ROOMS_URLS = ['/rooms', 'https://jam.clashprojects.qd.je/rooms'];
+      var ROOMS_URLS = ['/rooms', 'https://jam.clashgram.org/rooms'];
 
       function el(tag, cls, text) {
         var n = document.createElement(tag);
@@ -545,6 +546,9 @@
           : 'lastwave://jam?code=' + enc;
         var joinBtn = document.getElementById('btn-join-app');
         joinBtn.href = appLink;
+        // Always-on rooms have no host streaming to browsers.
+        if (station) document.getElementById('btn-listen-web').classList.add('hidden');
+        else document.getElementById('btn-listen-web').href = '/listen?code=' + enc;
         joinBtn.onclick = function () { showToast('Opening LastWave…'); };
 
         // Try once automatically; if the app is missing nothing happens.

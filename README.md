@@ -4,10 +4,10 @@ High-performance, low-latency "Listen Together" and in-room chat server for [Las
 
 ## Production Service
 
-- **Web Landing / Invites:** [https://jam.clashprojects.qd.je](https://jam.clashprojects.qd.je)
-- **Secure WebSocket:** `wss://jam.clashprojects.qd.je/ws`
-- **Health Status:** [https://jam.clashprojects.qd.je/health](https://jam.clashprojects.qd.je/health)
-- **Active Stats:** [https://jam.clashprojects.qd.je/stats](https://jam.clashprojects.qd.je/stats)
+- **Web Landing / Invites:** [https://jam.clashgram.org](https://jam.clashgram.org)
+- **Secure WebSocket:** `wss://jam.clashgram.org/ws`
+- **Health Status:** [https://jam.clashgram.org/health](https://jam.clashgram.org/health)
+- **Active Stats:** [https://jam.clashgram.org/stats](https://jam.clashgram.org/stats)
 
 ---
 
@@ -32,7 +32,7 @@ High-performance, low-latency "Listen Together" and in-room chat server for [Las
 - **Co-host (all rooms):** the main host can send `grant_host` / `revoke_host` with `{ "user_id": "..." }`. A room has at most two hosts (main + one co-host). Changes are broadcast as `cohost_changed` (`host_id`, `cohost_id`); `host_changed` also carries both IDs. If the main host leaves, the co-host is promoted. Participants have `is_cohost`; `is_host` is true for both.
 - **Shared queue:** the main host sends `queue_update` (their upcoming tracks, max 5); everyone else receives `queue_updated` and `playback.queue` in `sync_state`. Read-only: only the main host can publish, and the queue clears when the admin changes.
 - **Public room info:** `GET /rooms` returns `{rooms:[{code,name,participants}]}` for join screens; `sync_state` carries `room_name`; a `cooldown` message (`retry_at_ms`) tells the sender when pause/skip unlock.
-- **Invite links & previews:** share `https://jam.clashprojects.qd.je/?code=ROOM`. The page tries `lastwave://jam?code=ROOM` (Android uses an `intent://` link) so the installed desktop or Android app opens. The server injects Open Graph/Twitter tags per code and renders a black 1200x630 banner at `/og/ROOM.png`. Set `PUBLIC_BASE_URL` if hosted elsewhere.
+- **Invite links & previews:** share `https://jam.clashgram.org/?code=ROOM`. The page tries `lastwave://jam?code=ROOM` (Android uses an `intent://` link) so the installed desktop or Android app opens. The server injects Open Graph/Twitter tags per code and renders a black 1200x630 banner at `/og/ROOM.png`. Set `PUBLIC_BASE_URL` if hosted elsewhere.
 - **Replies:** `send_chat` accepts `reply_to_id`; broadcast `chat_message` includes a `reply_to` snapshot (`id`, `user_id`, `user_name`, `text`).
 
 ## Quickstart

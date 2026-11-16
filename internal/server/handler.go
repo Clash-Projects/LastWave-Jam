@@ -46,21 +46,38 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /og/{file}", h.handleOG)
 	h.registerAdminRoutes(mux)
 
-	// Serve self-contained invite landing page
-	indexHTML, err := embeddedWebFS.ReadFile("web/index.html")
-	if err == nil {
-		page := string(indexHTML)
-		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	if logoPNG, err := embeddedWebFS.ReadFile("web/logo.png"); err == nil {
+		mux.HandleFunc("GET /logo.png", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/png")
+			w.Header().Set("Cache-Control", "public, max-age=604800")
+			_, _ = w.Write(logoPNG)
+		})
+	}
+
+	// /?code=ROOM is the invite page (opens the app, with a "Listen in your
+	// browser" button); /listen?code=ROOM is the browser player. The
+	// always-on stations have no browser player.
+	indexHTML, errIndex := embeddedWebFS.ReadFile("web/index.html")
+	listenHTML, errListen := embeddedWebFS.ReadFile("web/listen.html")
+	if errIndex == nil && errListen == nil {
+		index, listen := string(indexHTML), string(listenHTML)
+		serve := func(w http.ResponseWriter, r *http.Request) {
 			code := normalizeCode(r.URL.Query().Get("code"))
 			if code == "" {
 				code = normalizeCode(r.URL.Query().Get("room"))
+			}
+			page := index
+			if r.URL.Path == "/listen" && code != "" && stationName(code) == "" {
+				page = listen
 			}
 			body := strings.Replace(page, metaMarker, renderMeta(code), 1)
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("Cache-Control", "no-cache")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(body))
-		})
+		}
+		mux.HandleFunc("GET /listen", func(w http.ResponseWriter, r *http.Request) { serve(w, r) })
+		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) { serve(w, r) })
 	}
 }
 

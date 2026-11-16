@@ -19,6 +19,8 @@ const (
 	MsgTypeRevokeHost        = "revoke_host"
 	MsgTypeTransferHost      = "transfer_host"
 	MsgTypePing              = "ping"
+	MsgTypeSetWebGuests      = "set_web_guests"
+	MsgTypeRTCSignal         = "rtc_signal" // both directions: WebRTC SDP between host and a browser guest
 
 	// Server -> Client
 	MsgTypeRoomCreated        = "room_created"
@@ -36,6 +38,7 @@ const (
 	MsgTypeSuggestionReceived = "suggestion_received"
 	MsgTypePong               = "pong"
 	MsgTypeError              = "error"
+	MsgTypeWebGuestsChanged   = "web_guests_changed"
 )
 
 // Playback Actions
@@ -73,6 +76,21 @@ type CreateRoomPayload struct {
 type JoinRoomPayload struct {
 	RoomCode string `json:"room_code"`
 	Name     string `json:"name"`
+	// ClientKind is "web" for the browser listen page; empty for the apps.
+	ClientKind string `json:"client_kind,omitempty"`
+}
+
+// SetWebGuestsPayload lets the main host allow or stop browser guests.
+type SetWebGuestsPayload struct {
+	Enabled bool `json:"enabled"`
+}
+
+// RTCSignalPayload carries opaque WebRTC signaling (SDP) between the main
+// host and one browser guest. Audio itself never touches the server.
+type RTCSignalPayload struct {
+	To   string          `json:"to,omitempty"`
+	From string          `json:"from,omitempty"`
+	Data json.RawMessage `json:"data"`
 }
 
 // SendChatPayload is sent by a client to broadcast a chat message.
@@ -150,6 +168,7 @@ type Participant struct {
 	Name     string `json:"name"`
 	IsHost   bool   `json:"is_host"`
 	IsCoHost bool   `json:"is_cohost"`
+	IsWeb    bool   `json:"is_web,omitempty"`
 	JoinedAt int64  `json:"joined_at"`
 }
 
@@ -165,6 +184,7 @@ type SyncStatePayload struct {
 	RoomName     string        `json:"room_name,omitempty"`
 	Radio        bool          `json:"radio,omitempty"`
 	StationAuto  bool          `json:"station_auto"`
+	WebGuests    bool          `json:"web_guests"`
 	RoomMode     string        `json:"room_mode"`
 	Playback     PlaybackState `json:"playback"`
 	Participants []Participant `json:"participants"`

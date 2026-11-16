@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
+<title>LastWave Jam</title>
+<!--LW_META-->
+<style>
+  :root {
+    --bg: #000; --s1: #0b0b0b; --s2: #141414; --s3: #1d1d1d;
+    --line: #1e1e1e; --line-2: #2c2c2c;
+    --text: #fafafa; --muted: #a3a3a3; --faint: #5f5f5f;
+    --r: 18px; --gut: 24px; --hdr: 64px; --nav: 68px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { min-height: 100vh; min-height: 100dvh; font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; letter-spacing: -0.006em; overflow-x: hidden; }
+  button, input { font: inherit; color: inherit; }
+  a { color: inherit; text-decoration: none; }
+  svg { display: block; }
+  .hidden { display: none !important; }
+  .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  :focus-visible { outline: 1.5px solid var(--text); outline-offset: 3px; }
+  ::selection { background: var(--text); color: var(--bg); }
+  .label { font: 500 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--faint); }
+
+  /* Grayscale cover as a backdrop. No blur: a scaled, faded image is cheap to draw. */
+  .backdrop { position: fixed; inset: 0 0 auto 0; height: 78vh; z-index: -1; overflow: hidden; pointer-events: none; }
+  .backdrop img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.1); opacity: .16; transform: scale(1.15); }
+  .backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.75) 55%, #000 100%); }
+
+  /* ---- controls ---- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 50px; padding: 0 24px;
+    border-radius: 999px; border: 1px solid var(--line-2); background: transparent; cursor: pointer; font-weight: 580; white-space: nowrap;
+    transition: background-color .15s, border-color .15s, transform .1s; }
+  .btn:hover { border-color: #444; background: rgba(255,255,255,.04); }
+  .btn:active { transform: scale(.98); }
+  .btn.solid { background: var(--text); border-color: var(--text); color: #000; }
+  .btn.solid:hover { background: #e2e2e2; border-color: #e2e2e2; }
+  .btn:disabled { opacity: .3; cursor: default; transform: none; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .field { width: 100%; height: 54px; padding: 0 18px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(255,255,255,.02); outline: none; transition: border-color .15s; }
+  .field:focus { border-color: #707070; }
+  .field::placeholder { color: var(--faint); }
+
+  /* ---- header ---- */
+  header { position: sticky; top: 0; z-index: 4; height: var(--hdr); background: rgba(0,0,0,.8); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1280px; height: 100%; margin: 0 auto; padding: 0 var(--gut); display: flex; align-items: center; gap: 14px; }
+  .logo { display: flex; align-items: center; gap: 11px; font-weight: 720; letter-spacing: -0.025em; font-size: 16px; }
+  .logo img { width: 30px; height: 30px; border-radius: 8px; }
+  .logo i { font-style: normal; color: var(--faint); font-weight: 500; }
+  .hdr-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 12.5px; color: var(--muted); white-space: nowrap; background: rgba(0,0,0,.4); }
+  .pill.code { font-family: var(--mono); letter-spacing: .16em; color: var(--text); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
+  .hlinks { display: flex; gap: 2px; margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
+  .lk { display: grid; justify-items: center; gap: 4px; min-width: 62px; padding: 6px 8px; border-radius: 10px; color: var(--muted); font-size: 11px; line-height: 1; transition: color .15s, background-color .15s; }
+  .lk svg { width: 19px; height: 19px; }
+  .lk:hover { color: var(--text); background: var(--s2); }
+
+  /* ---- join ---- */
+  .join { min-height: calc(100dvh - var(--hdr)); display: grid; place-items: center; padding: 56px var(--gut) calc(56px + var(--safe-b)); }
+  .join-card { width: 100%; max-width: 440px; }
+  .join .brand { width: 64px; height: 64px; border-radius: 16px; margin-bottom: 28px; box-shadow: 0 20px 50px -20px rgba(190,240,20,.45); }
+  .join h1 { margin: 14px 0 12px; font-size: clamp(36px, 8vw, 54px); line-height: 1; font-weight: 760; letter-spacing: -0.045em; }
+  .join .sub { color: var(--muted); margin: 0 0 36px; font-size: 16.5px; }
+  .codebox { border: 1px solid var(--line-2); border-radius: var(--r); padding: 20px 22px; margin-bottom: 20px; background: rgba(255,255,255,.02); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .codebox .v { font: 600 30px/1 var(--mono); letter-spacing: .22em; overflow-wrap: anywhere; }
+  .join form { display: grid; gap: 12px; }
+  .join .btn { width: 100%; height: 54px; }
+  .join .or { display: flex; align-items: center; gap: 14px; color: var(--faint); font: 11px var(--mono); letter-spacing: .16em; margin: 22px 0; }
+  .join .or::before, .join .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .join .msg { min-height: 22px; margin-top: 18px; font-size: 13.5px; color: var(--muted); }
+
+  /* ---- room: desktop ---- */
+  .room { max-width: 1280px; margin: 0 auto; padding: 56px var(--gut) 64px; display: grid; gap: 48px 56px;
+    grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "player chat" "next chat"; align-items: start; }
+  .pane-player { grid-area: player; min-width: 0; }
+  .pane-next { grid-area: next; min-width: 0; }
+  .pane-chat { grid-area: chat; min-width: 0; }
+
+  .player { display: grid; grid-template-columns: minmax(220px, 380px) minmax(0, 1fr); gap: 44px; align-items: center; }
+  .np > *, .seek > * { min-width: 0; }
+  .cover { position: relative; aspect-ratio: 1; width: 100%; border-radius: 20px; overflow: hidden; background: var(--s2); border: 1px solid rgba(255,255,255,.06);
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6); }
+  .cover img { width: 100%; height: 100%; object-fit: cover; }
+  .cover .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); }
+  .cover .ph svg { width: 46px; height: 46px; }
+  .np { min-width: 0; display: grid; gap: 30px; }
+  .eyebrow { display: flex; align-items: center; gap: 10px; }
+  .eyebrow .on { display: inline-flex; align-items: center; gap: 7px; height: 22px; padding: 0 9px; border-radius: 999px; background: var(--text); color: #000; font: 600 10.5px var(--mono); letter-spacing: .14em; }
+  .eyebrow .on::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #000; }
+  .np .title { margin: 14px 0 0; padding-bottom: .08em; font-size: clamp(32px, 3.8vw, 56px); font-weight: 760; line-height: 1.02; letter-spacing: -0.045em; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .np .artist { margin-top: 12px; font-size: 19px; color: var(--muted); }
+
+  .seek { display: grid; gap: 10px; }
+  .wave { width: 100%; max-width: 100%; height: 48px; display: block; }
+  .times { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--faint); }
+
+  .ctl { display: flex; align-items: center; gap: 18px; }
+  .ctl .main { width: 64px; height: 64px; padding: 0; flex: none; }
+  .ctl .main svg { width: 24px; height: 24px; }
+  .ctl .main .i-live, .ctl .main.live .i-play, .ctl .main.muted .i-live, .ctl .main:not(.muted) .i-mute { display: none; }
+  .ctl .main.live .i-live { display: block; }
+  .ctl .main.muted { background: transparent; color: var(--text); border-color: var(--line-2); }
+  .ctl .lt { display: grid; gap: 2px; min-width: 0; }
+  .ctl .lt b { font-size: 15px; font-weight: 640; }
+  .ctl .lt span { font-size: 12.5px; color: var(--faint); }
+  .vol { display: flex; align-items: center; gap: 12px; color: var(--faint); flex: 0 1 170px; min-width: 90px; margin-left: auto; }
+  .vol svg { width: 18px; height: 18px; flex: none; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 4px; background: var(--s3); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--text); border: 0; }
+  .status { font-size: 13.5px; color: var(--muted); min-height: 21px; display: flex; gap: 8px; align-items: center; }
+  .status.warn, .status.bad { color: var(--text); }
+  .status.warn::before, .status.bad::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--text); flex: none; }
+
+  .crowd { display: flex; align-items: center; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .stack { display: flex; }
+  .stack span { width: 30px; height: 30px; border-radius: 50%; margin-left: -8px; display: grid; place-items: center; font-size: 11px; font-weight: 650;
+    background: var(--s3); color: var(--muted); border: 2px solid #000; }
+  .stack span:first-child { margin-left: 0; }
+  .stack span.more { background: var(--text); color: #000; }
+  .crowd .who { font-size: 13px; color: var(--muted); min-width: 0; }
+  .qnote { margin-left: auto; font: 11px var(--mono); letter-spacing: .06em; color: var(--faint); white-space: nowrap; }
+
+  /* up next */
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .row { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 10px; margin: 0 -10px; border-radius: 12px; transition: background-color .15s; }
+  .row:hover { background: rgba(255,255,255,.03); }
+  .row .n { font: 12px var(--mono); color: var(--faint); }
+  .row img, .row .sq { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: var(--s2); }
+  .row .t { font-weight: 600; } .row .a { font-size: 13.5px; color: var(--muted); margin-top: 1px; }
+  .row .tag { font: 10px var(--mono); color: #000; background: var(--text); letter-spacing: .12em; border-radius: 999px; padding: 4px 9px; }
+  .row .tag:empty { display: none; }
+  .empty { color: var(--faint); font-size: 14px; padding: 12px 0; }
+
+  /* chat */
+  .chat { border: 1px solid var(--line); border-radius: var(--r); background: rgba(10,10,10,.85); display: flex; flex-direction: column;
+    position: sticky; top: calc(var(--hdr) + 28px); height: calc(100dvh - var(--hdr) - 56px); max-height: 800px; min-height: 440px; }
+  .chat-h { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .chat-h .c { font: 11px var(--mono); color: var(--faint); letter-spacing: .06em; }
+  .msgs { flex: 1; overflow-y: auto; padding: 6px 20px 14px; overscroll-behavior: contain; }
+  .m { padding: 12px 0; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
+  .m + .m { border-top: 1px solid var(--line); }
+  .av { width: 32px; height: 32px; border-radius: 50%; background: var(--s3); border: 1px solid var(--line-2); display: grid; place-items: center; font-size: 12px; font-weight: 650; color: var(--muted); }
+  .m .who { font-size: 13.5px; font-weight: 640; display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .m .who .h { font: 9.5px var(--mono); letter-spacing: .12em; color: #000; background: var(--text); border-radius: 999px; padding: 2px 7px; }
+  .m .who time { margin-left: auto; font: 11px var(--mono); color: var(--faint); font-weight: 400; flex: none; }
+  .m .tx { color: #d8d8d8; overflow-wrap: anywhere; margin-top: 3px; }
+  .m .rp { font-size: 12.5px; color: var(--faint); border-left: 2px solid var(--line-2); padding-left: 10px; margin-top: 6px; overflow-wrap: anywhere; }
+  .m.me .av { background: var(--text); color: #000; border-color: var(--text); }
+  .msgs .empty { display: grid; place-items: center; height: 100%; text-align: center; color: var(--faint); }
+  .msgs .empty svg { width: 28px; height: 28px; margin: 0 auto 10px; }
+  .compose { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); }
+  .compose .field { height: 50px; background: #000; }
+  .compose .btn { height: 50px; width: 50px; padding: 0; flex: none; }
+
+  .nav { display: none; }
+
+  /* ---- tablets ---- */
+  @media (max-width: 1100px) {
+    .room { grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; }
+    .player { grid-template-columns: 1fr; gap: 32px; }
+    .cover { max-width: 400px; }
+  }
+
+  /* ---- phones: full-height screens + bottom tabs ---- */
+  @media (max-width: 860px) {
+    :root { --gut: 20px; --hdr: 60px; }
+    .room { display: block; padding: 0; height: calc(100dvh - var(--hdr) - var(--nav) - var(--safe-b)); }
+    .room > section, .room > aside { display: none; height: 100%; }
+    .room[data-tab="player"] .pane-player,
+    .room[data-tab="chat"] .pane-chat,
+    .room[data-tab="next"] .pane-next { display: flex; flex-direction: column; }
+    .pane-player { justify-content: center; padding: 20px var(--gut) 16px; overflow-y: auto; }
+    .player { grid-template-columns: 1fr; gap: clamp(20px, 3.6dvh, 36px); justify-items: center; }
+    .cover { width: min(100%, 40dvh, 420px); border-radius: 22px; }
+    .np { width: 100%; max-width: 520px; gap: clamp(16px, 2.8dvh, 28px); }
+    .np .title { font-size: clamp(30px, 8.4vw, 42px); }
+    .np .artist { font-size: 17px; }
+    .wave { height: 40px; }
+    .ctl .main { width: 60px; height: 60px; }
+    .vol { flex-basis: 120px; }
+    .crowd { display: none; }
+    .qnote { display: none; }
+    .pane-next { padding: 24px var(--gut); overflow-y: auto; }
+    .chat { position: static; border: 0; border-radius: 0; height: 100%; max-height: none; min-height: 0; background: transparent; }
+    .chat-h { padding: 16px var(--gut); }
+    .msgs { padding: 4px var(--gut) 12px; }
+    .compose { padding: 12px var(--gut); }
+    .nav { display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+      height: calc(var(--nav) + var(--safe-b)); padding-bottom: var(--safe-b); background: rgba(0,0,0,.94); border-top: 1px solid var(--line); }
+    .nav button { position: relative; display: grid; justify-items: center; align-content: center; gap: 5px; border: 0; background: none; color: var(--faint); font-size: 11.5px; font-weight: 580; cursor: pointer; }
+    .nav button svg { width: 22px; height: 22px; }
+    .nav button[aria-selected="true"] { color: var(--text); }
+    .nav .badge { position: absolute; top: 12px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px #000; }
+  }
+  @media (max-width: 860px) and (max-height: 680px) { .cover { width: min(100%, 32dvh); } .crowd { display: none; } }
+  @media (max-width: 760px) {
+    .lk { min-width: 0; padding: 8px; font-size: 0; gap: 0; }
+    .hlinks { margin-left: 2px; padding-left: 6px; }
+    .pill.code { display: none; }
+  }
+  @media (max-width: 420px) { .logo .word { display: none; } }
+</style>
+</head>
+<body>
+<div class="backdrop hidden" id="backdrop" aria-hidden="true"><img id="backdrop-img" alt=""></div>
+
+<header>
+  <div class="bar">
+    <div class="logo"><img src="/logo.png" alt="" width="30" height="30"><span class="word">LastWave <i>Jam</i></span></div>
+    <div class="hdr-meta">
+      <span class="pill code" id="hdr-code"></span>
+      <span class="pill hidden" id="hdr-live"><span class="dot"></span><span id="count">0</span></span>
+      <nav class="hlinks" id="links-h" aria-label="Get LastWave"></nav>
+    </div>
+  </div>
+</header>
+
+<main id="join-view" class="join">
+  <div class="join-card">
+    <img class="brand" src="/logo.png" alt="LastWave" width="64" height="64">
+    <div class="label">You're invited</div>
+    <h1>Listen together, in sync.</h1>
+    <p class="sub">Join this room from your browser. No app or account needed.</p>
+    <div class="codebox"><span class="label">Room</span><span class="v" id="code-label"></span></div>
+    <form id="join-form">
+      <input class="field" id="name" maxlength="32" placeholder="Your name" autocomplete="nickname" required aria-label="Your name">
+      <button class="btn solid" type="submit">Listen in browser</button>
+    </form>
+    <div class="or">OR</div>
+    <a class="btn" id="open-app" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Open in LastWave app</a>
+    <div class="msg" id="join-status" role="status"></div>
+  </div>
+</main>
+
+<main id="room-view" class="room hidden" data-tab="player">
+  <section class="pane-player" aria-label="Now playing">
+    <div class="player">
+      <div class="cover">
+        <div class="ph" id="art-ph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+        <img id="cover" alt="" class="hidden">
+      </div>
+      <div class="np">
+        <div>
+          <div class="eyebrow"><span class="on hidden" id="on-air">LIVE</span><span class="label">Now playing</span></div>
+          <h2 class="title" id="title">Nothing playing yet</h2>
+          <div class="artist ell" id="artist">Waiting for the host</div>
+        </div>
+        <div class="seek" aria-hidden="true">
+          <canvas class="wave" id="wave"></canvas>
+          <div class="times"><span id="t-pos">0:00</span><span id="t-dur">0:00</span></div>
+        </div>
+        <div class="ctl">
+          <button id="listen" class="btn solid main" type="button" aria-label="Listen">
+            <svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            <svg class="i-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6M21 9l-5 6"/></svg>
+          </button>
+          <div class="lt"><b id="listen-t">Listen</b><span id="listen-s">Tap to join the audio</span></div>
+          <label class="vol" title="Volume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input id="vol" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume"></label>
+        </div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+        <div class="crowd"><div class="stack" id="stack"></div><div class="who ell" id="who"></div><span class="qnote">~128 KBPS IN BROWSER</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pane-next" aria-label="Up next">
+    <div class="sec-h"><span class="label">Up next</span></div>
+    <div id="next"></div>
+  </section>
+
+  <aside class="pane-chat chat" aria-label="Room chat">
+    <div class="chat-h"><span class="label">Chat</span><span class="c" id="chat-count"></span></div>
+    <div class="msgs" id="chat" aria-live="polite">
+      <div class="empty" id="chat-empty"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>No messages yet. Say hi.</div></div>
+    </div>
+    <form class="compose" id="chat-form">
+      <input class="field" id="chat-input" maxlength="500" placeholder="Message the room" autocomplete="off" aria-label="Message">
+      <button class="btn solid" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+  </aside>
+</main>
+
+<nav class="nav hidden" id="nav" role="tablist" aria-label="Room">
+  <button role="tab" data-tab="player" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Playing</button>
+  <button role="tab" data-tab="chat" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Chat<span class="badge hidden" id="badge"></span></button>
+  <button role="tab" data-tab="next" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Up next</button>
+</nav>
+
+<template id="links-tpl">
+  <a class="lk" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener" aria-label="Desktop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Desktop</a>
+  <a class="lk" href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener" aria-label="Android"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>Android</a>
+  <a class="lk" href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener" aria-label="Discord"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5.5a14 14 0 0 1 10 0l1.5 2.5c1.5 3 2 6 1.8 9.2-1.6 1.2-3.2 1.9-4.8 2.3l-1-2a11 11 0 0 1-5 0l-1 2c-1.6-.4-3.2-1.1-4.8-2.3-.2-3.2.3-6.2 1.8-9.2z"/><circle cx="9.3" cy="12.5" r="1.2"/><circle cx="14.7" cy="12.5" r="1.2"/></svg>Discord</a>
+  <a class="lk" href="https://t.me/clashprojects" target="_blank" rel="noopener" aria-label="Telegram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.5 4-19 7.4 6.3 2.3L18 7.6l-7.2 7.8.2 5.1 3-3.6 4.4 3.3z"/></svg>Telegram</a>
+</template>
+
+<audio id="deck-a" preload="auto"></audio>
+<audio id="deck-b" preload="auto"></audio>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var code = (params.get('code') || params.get('room') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // The page is mirrored on static hosting; signaling always lives on the Jam server.
+  var sameOrigin = /(^|\.)clashgram\.org$|^localhost$|^127\./.test(location.hostname);
+  var WS_URL = sameOrigin ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws' : 'wss://jam.clashgram.org/ws';
+  var ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+  var MAX_TRIES = 3, STALL_MS = 25000;
+
+  var ws = null, me = '', hostId = '', webOn = false, count = 0, chatN = 0, people = {};
+  var play = { track: null, pos: 0, at: 0, playing: false };
+  var queue = [], clockOffset = 0; // server_ms - local_ms
+  var pc = null, dc = null, wantAudio = false, muted = false, connectTimer = 0, blocked = false;
+  // asked[id]: request time, or 'refused' when the host said the song isn't in the room yet.
+  var songs = {}, asked = {}, tries = {}, incoming = null, lastByteAt = 0;
+  var decks = [mkDeck($('deck-a')), mkDeck($('deck-b'))];
+
+  $('code-label').textContent = code || '—';
+  $('hdr-code').textContent = code || '—';
+  $('links-h').appendChild($('links-tpl').content.cloneNode(true));
+  // Opens whichever LastWave is installed; Android needs an intent link.
+  var enc = encodeURIComponent(code);
+  $('open-app').href = /Android/i.test(navigator.userAgent)
+    ? 'intent://jam?code=' + enc + '#Intent;scheme=lastwave;package=com.lastwave.app;end'
+    : 'lastwave://jam?code=' + enc;
+  try { $('name').value = localStorage.getItem('lw_jam_name') || ''; } catch (e) {}
+  try { var v = parseFloat(localStorage.getItem('lw_jam_vol')); if (v >= 0 && v <= 1) $('vol').value = v; } catch (e) {}
+  if (!code) $('join-status').textContent = 'This link has no room code. Ask the host for the full link.';
+
+  function status(text, cls) { var s = $('status'); s.textContent = text || ''; s.className = 'status' + (cls ? ' ' + cls : ''); }
+  // Main button: Listen -> Live (tap to mute) -> Muted (tap to unmute); Retry/Try again restart.
+  var SUB = { Listen: 'Tap to join the audio', Live: 'Tap to mute', Muted: 'Tap to unmute', Retry: 'Tap to try this song again', 'Try again': 'Tap to reconnect' };
+  function listenLabel(t) {
+    var b = $('listen');
+    $('listen-t').textContent = t;
+    $('listen-s').textContent = SUB[t] || '';
+    b.classList.toggle('live', t === 'Live' || t === 'Muted');
+    b.classList.toggle('muted', t === 'Muted');
+    $('on-air').classList.toggle('hidden', t !== 'Live');
+  }
+  function send(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, payload: payload })); }
+  function signal(data) { if (hostId) send('rtc_signal', { to: hostId, data: data }); }
+  function fmt(ms) { if (!isFinite(ms) || ms < 0) ms = 0; var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  /* ---- tabs (phones) ---- */
+  function tab() { return $('room-view').dataset.tab; }
+  document.querySelectorAll('.nav button').forEach(function (b) {
+    b.onclick = function () {
+      $('room-view').dataset.tab = b.dataset.tab;
+      document.querySelectorAll('.nav button').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+      if (b.dataset.tab === 'chat') { $('badge').classList.add('hidden'); var c = $('chat'); c.scrollTop = c.scrollHeight; }
+      if (b.dataset.tab === 'player') drawWave();
+    };
+  });
+  var phone = window.matchMedia('(max-width: 860px)');
+
+  /* ---- join / socket ---- */
+  $('join-form').onsubmit = function (e) {
+    e.preventDefault();
+    var name = $('name').value.trim();
+    if (!name || !code) return;
+    try { localStorage.setItem('lw_jam_name', name); } catch (err) {}
+    connect(name);
+  };
+
+  function connect(name) {
+    // A rejected join (e.g. browser listening off) keeps the socket: just retry on it.
+    if (ws && ws.readyState === 1) return send('join_room', { room_code: code, name: name, client_kind: 'web' });
+    if (ws && ws.readyState === 0) return;
+    $('join-status').textContent = 'Connecting…';
+    ws = new WebSocket(WS_URL);
+    ws.onopen = function () { send('join_room', { room_code: code, name: name, client_kind: 'web' }); send('ping', Date.now()); };
+    ws.onmessage = function (ev) { try { var m = JSON.parse(ev.data); onMessage(m.type, m.payload || {}); } catch (e) {} };
+    ws.onclose = function () {
+      closePeer(); pauseAll();
+      if (me) status('Disconnected from the room. Reload to rejoin.', 'bad');
+      else if ($('join-status').textContent === 'Connecting…') $('join-status').textContent = 'Could not reach the Jam server.';
+      me = '';
+    };
+  }
+  setInterval(function () { send('ping', Date.now()); }, 25000);
+
+  function onMessage(type, p) {
+    switch (type) {
+      case 'sync_state':
+        me = p.user_id; hostId = p.host_id || ''; webOn = !!p.web_guests;
+        people = {};
+        (p.participants || []).forEach(function (x) { people[x.user_id] = x.name; });
+        count = (p.participants || []).length;
+        $('join-view').classList.add('hidden'); $('room-view').classList.remove('hidden');
+        $('hdr-live').classList.remove('hidden'); $('nav').classList.remove('hidden');
+        (p.chat_history || []).forEach(function (m) { addChat(m, true); });
+        queue = (p.playback || {}).queue || [];
+        applyPlayback(p.playback || {}, (p.playback || {}).current_track);
+        renderCount(); refreshListenState();
+        break;
+      case 'pong':
+        if (p.client_time_ms) clockOffset = p.server_time_ms - (p.client_time_ms + Date.now()) / 2;
+        break;
+      case 'user_joined':
+        if (p.user_id) people[p.user_id] = p.name || '';
+        if (typeof p.total_users === 'number') count = p.total_users;
+        renderCount();
+        break;
+      case 'user_left':
+        delete people[p.user_id];
+        if (typeof p.total_users === 'number') count = p.total_users;
+        renderCount();
+        break;
+      case 'host_changed': case 'cohost_changed':
+        var next = p.host_id || p.new_host_id || hostId;
+        if (next !== hostId) { hostId = next; closePeer(); pauseAll(); refreshListenState(); }
+        break;
+      case 'web_guests_changed':
+        webOn = !!p.enabled;
+        if (!webOn) closePeer();
+        refreshListenState();
+        break;
+      case 'chat_message': addChat(p); break;
+      case 'sync_playback': if (p.queue) queue = p.queue; applyPlayback(p, p.track); break;
+      case 'queue_updated': queue = p.queue || []; forgetRefusals(); renderQueue(); refreshDecks(); break;
+      case 'rtc_signal': if (p.from === hostId) onSignal(p.data || {}); break;
+      case 'error':
+        if (!me) {
+          $('join-status').textContent = p.code === 'web_guests_off'
+            ? 'The host hasn’t allowed browser listening in this room. Open it in the LastWave app instead.'
+            : (p.message || 'Could not join this room.');
+        } else if (p.message) status(p.message, 'warn');
+        break;
+    }
+  }
+
+  function renderCount() {
+    $('count').textContent = count + ' listening';
+    var names = Object.keys(people).map(function (k) { return people[k] || '?'; });
+    var stack = $('stack'); stack.textContent = '';
+    names.slice(0, 4).forEach(function (n) { stack.appendChild(el('span', '', n.charAt(0).toUpperCase())); });
+    if (count > 4) stack.appendChild(el('span', 'more', '+' + (count - 4)));
+    $('who').textContent = !names.length ? '' : names.length === 1 ? names[0] + ' is here'
+      : names.slice(0, 2).join(', ') + (count > 2 ? ' and ' + (count - 2) + ' more' : '') + ' listening';
+  }
+
+  function refreshListenState() {
+    var btn = $('listen');
+    if (!webOn || !hostId) {
+      btn.disabled = true; wantAudio = false; listenLabel('Listen');
+      pauseAll();
+      status(hostId ? 'The host turned off browser listening. Chat still works.' : 'Waiting for a host…', 'warn');
+      return;
+    }
+    btn.disabled = false;
+    if (wantAudio && !pc) startListening();
+    else if (!wantAudio) status('');
+  }
+
+  /* ---- now playing ---- */
+  function nowServer() { return Date.now() + clockOffset; }
+  function positionMs() { return play.playing ? play.pos + (nowServer() - play.at) : play.pos; }
+  function durationMs() {
+    var d = deckFor(play.track && play.track.id);
+    if (d && isFinite(d.el.duration) && d.el.duration > 0) return d.el.duration * 1000;
+    return (play.track && play.track.duration_ms) || 0;
+  }
+
+  function applyPlayback(p, track) {
+    var changed = track && (!play.track || play.track.id !== track.id);
+    if (track) play.track = track;
+    play.pos = p.position_ms || 0; play.at = p.server_time_ms || nowServer(); play.playing = !!p.is_playing;
+    var t = play.track;
+    $('title').textContent = t ? t.title : 'Nothing playing yet';
+    $('artist').textContent = t ? (t.artist || '') : 'Waiting for the host';
+    document.title = t ? t.title + ' · ' + (t.artist || '') + ' — LastWave Jam' : 'LastWave Jam';
+    if (changed || !t) {
+      setCover(t && t.artwork_url);
+      // A new song gets a clean slate: earlier refusals or failures (often just
+      // the queue syncing a moment late) must not keep it from loading.
+      if (t) { delete tries[t.id]; forgetRefusals(); }
+      bars = null;
+    }
+    renderQueue();
+    refreshDecks();
+    tick();
+  }
+
+  function setCover(url) {
+    var img = $('cover'), bd = $('backdrop');
+    if (!url) { img.classList.add('hidden'); $('art-ph').classList.remove('hidden'); bd.classList.add('hidden'); return; }
+    img.onload = function () { img.classList.remove('hidden'); $('art-ph').classList.add('hidden'); };
+    img.onerror = function () { img.classList.add('hidden'); $('art-ph').classList.remove('hidden'); };
+    img.src = url;
+    $('backdrop-img').src = url; bd.classList.remove('hidden');
+  }
+
+  function renderQueue() {
+    var box = $('next');
+    box.textContent = '';
+    if (!queue.length) { box.appendChild(el('div', 'empty', 'Nothing queued yet.')); return; }
+    queue.slice(0, 5).forEach(function (q, i) {
+      var row = el('div', 'row');
+      row.appendChild(el('span', 'n', String(i + 1).padStart(2, '0')));
+      if (q.artwork_url) { var im = el('img'); im.src = q.artwork_url; im.alt = ''; im.loading = 'lazy'; row.appendChild(im); } else row.appendChild(el('div', 'sq'));
+      var txt = el('div'); txt.style.minWidth = '0';
+      txt.appendChild(el('div', 't ell', q.title)); txt.appendChild(el('div', 'a ell', q.artist || ''));
+      row.appendChild(txt);
+      row.appendChild(el('span', 'tag', i === 0 && wantAudio && songs[q.id] && songs[q.id].done ? 'READY' : ''));
+      box.appendChild(row);
+    });
+  }
+
+  /* ---- waveform seekbar: bars seeded from the song id, drawn on a canvas at 4 Hz ---- */
+  var bars = null, waveW = 0;
+  function seeded(id, n) {
+    var h = 2166136261;
+    for (var i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+    var out = [];
+    for (var k = 0; k < n; k++) {
+      h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+      var r = ((h >>> 0) % 1000) / 1000;
+      var shape = 0.55 + 0.45 * Math.sin((k / n) * Math.PI); // fuller in the middle
+      out.push(0.18 + 0.82 * r * shape);
+    }
+    return out;
+  }
+  function drawWave() {
+    var c = $('wave'), dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+    if (!w) return;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    var n = Math.max(24, Math.floor(w / 5));
+    if (!bars || bars.length !== n || waveW !== w) { bars = seeded(play.track ? play.track.id : 'idle', n); waveW = w; }
+    var g = c.getContext('2d'), dur = durationMs(), pos = Math.min(positionMs(), dur || 0);
+    var played = dur ? pos / dur : 0, s = play.track && songs[play.track.id], buffered = s && wantAudio ? Math.min(1, s.got / s.size) : 0;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    var step = w / n, bw = Math.max(2, step - 2);
+    for (var i = 0; i < n; i++) {
+      var f = i / n, bh = Math.max(3, bars[i] * h);
+      g.fillStyle = !play.track ? '#1d1d1d' : f < played ? '#fafafa' : f < buffered ? '#3a3a3a' : '#1f1f1f';
+      var x = i * step, y = (h - bh) / 2, r = bw / 2;
+      g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + bw, y, x + bw, y + bh, r); g.arcTo(x + bw, y + bh, x, y + bh, r); g.arcTo(x, y + bh, x, y, r); g.arcTo(x, y, x + bw, y, r); g.fill();
+    }
+  }
+  window.addEventListener('resize', function () { bars = null; drawWave(); });
+
+  // 4 Hz tick: waveform and times. Cheap on CPU.
+  function tick() {
+    var dur = durationMs(), pos = play.track ? Math.min(positionMs(), dur || Infinity) : 0;
+    $('t-pos').textContent = fmt(pos); $('t-dur').textContent = fmt(play.track ? dur : 0);
+    drawWave();
+  }
+  setInterval(tick, 250);
+
+  /* ---- chat ---- */
+  function addChat(m, history) {
+    var box = $('chat'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+    var empty = $('chat-empty'); if (empty) empty.remove();
+    var name = m.user_name || 'Someone', row = el('div', 'm' + (m.user_id === me ? ' me' : ''));
+    row.appendChild(el('div', 'av', name.charAt(0).toUpperCase()));
+    var body = el('div'), who = el('div', 'who');
+    body.style.minWidth = '0';
+    who.appendChild(el('span', 'ell', name));
+    if (m.is_host) who.appendChild(el('span', 'h', 'HOST'));
+    if (m.timestamp) who.appendChild(el('time', '', new Date(m.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+    body.appendChild(who);
+    if (m.reply_to) body.appendChild(el('div', 'rp', (m.reply_to.user_name || '') + ': ' + (m.reply_to.text || '')));
+    body.appendChild(el('div', 'tx', m.text || ''));
+    row.appendChild(body); box.appendChild(row);
+    while (box.childNodes.length > 200) box.removeChild(box.firstChild);
+    chatN++; $('chat-count').textContent = chatN + (chatN === 1 ? ' MESSAGE' : ' MESSAGES');
+    if (stick || m.user_id === me) box.scrollTop = box.scrollHeight;
+    // Unread dot on the Chat tab when the message arrives on another screen.
+    if (!history && phone.matches && tab() !== 'chat' && m.user_id !== me) $('badge').classList.remove('hidden');
+  }
+  $('chat-form').onsubmit = function (e) {
+    e.preventDefault();
+    var input = $('chat-input'), text = input.value.trim();
+    if (text) send('send_chat', { text: text });
+    input.value = '';
+  };
+
+  /* ---- P2P song files (receive-only data channel: no mic, camera or prompts) ----
+     The host sends the YouTube version (~128 kbps) of the current and next song
+     in 512 KB ranges straight from its app. Two decks: the next song buffers in
+     the idle deck, so the switch at a track change is instant. */
+  $('vol').oninput = function () {
+    decks.forEach(function (d) { d.el.volume = +$('vol').value; });
+    try { localStorage.setItem('lw_jam_vol', $('vol').value); } catch (e) {}
+  };
+  decks.forEach(function (d) { d.el.volume = +$('vol').value; });
+
+  $('listen').onclick = function () {
+    var label = $('listen-t').textContent;
+    // Once live, the button only mutes locally: the room keeps playing in sync.
+    if (wantAudio && (label === 'Live' || label === 'Muted') && dc && dc.readyState === 'open') {
+      muted = !muted;
+      decks.forEach(function (d) { d.el.muted = muted; });
+      listenLabel(muted ? 'Muted' : 'Live');
+      if (!muted) syncAudio(true);
+      return;
+    }
+    wantAudio = true; muted = false;
+    decks.forEach(function (d) { d.el.muted = false; });
+    tries = {}; forgetRefusals(); // a manual press retries everything
+    listenLabel('Live');
+    // Unlock both decks inside the tap: iOS Safari only lets an element play
+    // later if it was started by a tap, so the second deck needs it too.
+    decks.forEach(unlockDeck);
+    if (!dc || dc.readyState !== 'open') startListening(); else refreshDecks();
+    syncAudio(true);
+  };
+
+  function startListening() {
+    closePeer();
+    if (!webOn || !hostId) return refreshListenState();
+    if (!window.RTCPeerConnection) return status('This browser can’t connect to the host. Try a recent Chrome, Edge, Firefox or Safari.', 'bad');
+    status('Connecting to the host…');
+    pc = new RTCPeerConnection({ iceServers: ICE });
+    var mine = pc;
+    pc.ondatachannel = function (ev) {
+      dc = ev.channel;
+      dc.binaryType = 'arraybuffer';
+      dc.onopen = function () { clearTimeout(connectTimer); status('Connected. Loading song…'); refreshDecks(); };
+      dc.onmessage = onData;
+      // The host dropped the channel (app restart, network blip): reconnect.
+      dc.onclose = function () { if (pc === mine && wantAudio) setTimeout(function () { if (pc === mine) startListening(); }, 1500); };
+    };
+    pc.onconnectionstatechange = function () {
+      if (pc !== mine) return;
+      var s = pc.connectionState;
+      if (s === 'disconnected') status('Connection unstable, recovering…', 'warn');
+      else if (s === 'failed') failDirect();
+    };
+    // Direct P2P only: if it can't connect, say so instead of waiting forever.
+    connectTimer = setTimeout(function () { if (pc === mine && (!dc || dc.readyState !== 'open')) failDirect(); }, 20000);
+    signal({ kind: 'hello' });
+  }
+
+  function failDirect() {
+    closePeer();
+    status('Your network blocks a direct connection to the host. Chat still works. Try another network.', 'bad');
+    listenLabel('Try again');
+  }
+
+  function closePeer() {
+    clearTimeout(connectTimer);
+    var old = pc; pc = null; dc = null;
+    if (old) { try { old.close(); } catch (e) {} }
+    incoming = null; asked = {};
+    // Half-received songs can't resume on a new connection.
+    Object.keys(songs).forEach(function (id) {
+      if (songs[id].done) return;
+      delete songs[id];
+      decks.forEach(function (d) { if (d.id === id) resetDeck(d); });
+    });
+    $('listen').disabled = !webOn || !hostId;
+  }
+
+  function onSignal(d) {
+    if (d.kind === 'offer' && pc) {
+      var mine = pc;
+      pc.setRemoteDescription({ type: 'offer', sdp: d.sdp })
+        .then(function () { return mine.createAnswer(); })
+        .then(function (ans) { return mine.setLocalDescription(ans); })
+        .then(function () { return iceDone(mine); })
+        .then(function () { if (pc === mine) signal({ kind: 'answer', sdp: mine.localDescription.sdp }); })
+        .catch(function () { if (pc === mine) failDirect(); });
+    } else if (d.kind === 'bye') {
+      wantAudio = false; closePeer(); pauseAll();
+      status(d.reason === 'busy' ? 'The host’s stream is full right now. Try again shortly.' : 'The host stopped the stream.', 'warn');
+      listenLabel('Listen');
+    }
+  }
+
+  // Non-trickle ICE: one answer message per guest keeps signaling tiny.
+  function iceDone(conn) {
+    return new Promise(function (resolve) {
+      if (conn.iceGatheringState === 'complete') return resolve();
+      var t = setTimeout(resolve, 3000);
+      conn.addEventListener('icegatheringstatechange', function () { if (conn.iceGatheringState === 'complete') { clearTimeout(t); resolve(); } });
+    });
+  }
+
+  // Current song first, then the next one, so the track change is seamless.
+  function wanted() { return [play.track && play.track.id, queue[0] && queue[0].id].filter(Boolean); }
+  function forgetRefusals() { Object.keys(asked).forEach(function (id) { if (asked[id] === 'refused') delete asked[id]; }); }
+  function requestSongs() {
+    if (!wantAudio || !dc || dc.readyState !== 'open') return;
+    wanted().forEach(function (id) {
+      if (songs[id] || asked[id] || (tries[id] || 0) >= MAX_TRIES) return;
+      asked[id] = Date.now();
+      dc.send(JSON.stringify({ kind: 'get', id: id }));
+    });
+  }
+
+  function onData(ev) {
+    if (typeof ev.data !== 'string') {
+      if (!incoming) return;
+      lastByteAt = Date.now();
+      incoming.parts.push(ev.data);
+      incoming.got += ev.data.byteLength;
+      var id = incoming.id;
+      decks.forEach(function (d) { if (d.id === id) pump(d); });
+      if (incoming.parts.length === 1) refreshDecks();
+      return;
+    }
+    var m;
+    try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.kind === 'file') {
+      incoming = songs[m.id] = { id: m.id, mime: m.mime || 'audio/mp4', size: m.size || 1, got: 0, parts: [], done: false };
+      lastByteAt = Date.now();
+      // Keep only songs the room still needs in memory.
+      var keep = wanted();
+      Object.keys(songs).forEach(function (id) {
+        if (id !== m.id && keep.indexOf(id) < 0 && !decks.some(function (d) { return d.id === id; })) delete songs[id];
+      });
+    } else if (m.kind === 'end' && songs[m.id]) {
+      songs[m.id].done = true;
+      if (incoming && incoming.id === m.id) incoming = null;
+      decks.forEach(function (d) { if (d.id === m.id) pump(d); });
+      renderQueue(); refreshDecks();
+    } else if (m.kind === 'missing') {
+      if (incoming && incoming.id === m.id) incoming = null;
+      if (m.reason === 'no_youtube') noStream(m.id);
+      // Not in the room yet (the host's queue syncs a moment later): not a
+      // failure, ask again on the next track or queue change.
+      else if (m.reason === 'not_allowed') { asked[m.id] = 'refused'; }
+      else songFailed(m.id);
+    }
+  }
+
+  // Local or lossless-only song: nothing to stream, so say so and wait for the next one.
+  function noStream(id) {
+    delete songs[id]; asked[id] = false; tries[id] = MAX_TRIES;
+    if (play.track && id === play.track.id) status('This song is only on the host’s device and can’t play here. The next one will.', 'warn');
+  }
+
+  // A song the host couldn't send: retry with backoff, then tell the listener.
+  function songFailed(id) {
+    delete songs[id]; asked[id] = false;
+    if (incoming && incoming.id === id) incoming = null;
+    decks.forEach(function (d) { if (d.id === id) resetDeck(d); });
+    tries[id] = (tries[id] || 0) + 1;
+    if (tries[id] < MAX_TRIES) { setTimeout(refreshDecks, 2000 * tries[id]); return; }
+    if (play.track && id === play.track.id) {
+      status('This song couldn’t be streamed. Tap Retry to try again.', 'warn');
+      listenLabel('Retry');
+    }
+  }
+
+  // Watchdogs: a request the host never answers is retried, and a transfer
+  // that stops mid-song reconnects, so no song sits on "Loading" forever.
+  setInterval(function () {
+    var now = Date.now();
+    Object.keys(asked).forEach(function (id) {
+      if (typeof asked[id] === 'number' && !songs[id] && now - asked[id] > STALL_MS) songFailed(id);
+    });
+    if (incoming && wantAudio && now - lastByteAt > STALL_MS) {
+      status('Transfer stalled, reconnecting…', 'warn');
+      startListening();
+    }
+  }, 5000);
+
+  /* ---- decks ---- */
+  var MS = window.ManagedMediaSource || window.MediaSource;
+  function mseType(mime) {
+    if (/codecs=/.test(mime)) return mime;
+    return /webm/.test(mime) ? 'audio/webm; codecs="opus"' : 'audio/mp4; codecs="mp4a.40.2"';
+  }
+  function mkDeck(audio) {
+    var d = { el: audio, id: '', media: null, url: '', unlocked: false };
+    audio.disableRemotePlayback = true; // required by ManagedMediaSource (iOS)
+    audio.addEventListener('loadedmetadata', function () { if (play.track && d.id === play.track.id) syncAudio(true); });
+    audio.addEventListener('waiting', function () { if (wantAudio && play.track && d.id === play.track.id) status('Buffering…'); });
+    audio.addEventListener('playing', function () { if (play.track && d.id === play.track.id) status('In sync with the room'); });
+    return d;
+  }
+  // 0.1 s of silence: playing it inside the tap marks the element as allowed.
+  var SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+  function unlockDeck(d) {
+    if (d.id || d.unlocked) return;
+    d.unlocked = true;
+    d.el.src = SILENCE;
+    d.el.play().then(function () {
+      if (!d.id && d.el.src === SILENCE) { d.el.pause(); d.el.removeAttribute('src'); d.el.load(); }
+    }).catch(function () { d.unlocked = false; });
+  }
+  function deckFor(id) { return id ? decks.filter(function (d) { return d.id === id; })[0] : null; }
+  function resetDeck(d) {
+    d.el.pause(); d.el.removeAttribute('src'); d.el.load();
+    if (d.url) URL.revokeObjectURL(d.url);
+    d.id = ''; d.media = null; d.url = '';
+  }
+
+  // Loads a song into a deck as soon as its first range arrives (MSE), or once
+  // complete on browsers without MSE. Returns false when it can't load yet.
+  function loadDeck(d, song) {
+    var type = mseType(song.mime);
+    if (MS && MS.isTypeSupported(type)) {
+      if (!song.parts.length) return false;
+      resetDeck(d);
+      var ms = new MS(), media = { ms: ms, sb: null, appended: 0, song: song };
+      d.id = song.id; d.media = media; d.url = URL.createObjectURL(ms);
+      d.el.src = d.url;
+      ms.addEventListener('sourceopen', function () {
+        if (d.media !== media) return;
+        try { media.sb = ms.addSourceBuffer(type); } catch (e) { resetDeck(d); status('This browser can’t play this song format.', 'bad'); return; }
+        media.sb.addEventListener('updateend', function () { pump(d); });
+        media.sb.addEventListener('error', function () { if (d.media === media) songFailed(song.id); });
+        pump(d);
+      });
+      return true;
+    }
+    if (!song.done) return false;
+    resetDeck(d);
+    d.id = song.id; d.url = URL.createObjectURL(new Blob(song.parts, { type: song.mime }));
+    d.el.src = d.url;
+    return true;
+  }
+
+  function pump(d) {
+    var m = d.media;
+    if (!m || !m.sb || m.sb.updating || m.ms.readyState !== 'open') return;
+    if (m.appended < m.song.parts.length) {
+      try { m.sb.appendBuffer(m.song.parts[m.appended++]); } catch (e) { m.appended--; }
+    } else if (m.song.done) {
+      try { m.ms.endOfStream(); } catch (e) {}
+    }
+  }
+
+  // Keep the current song in one deck and the next one buffering in the other.
+  function refreshDecks() {
+    requestSongs();
+    if (!wantAudio) return;
+    var cur = play.track && play.track.id, nxt = queue[0] && queue[0].id;
+    if (cur && !deckFor(cur) && songs[cur]) {
+      var free = decks.filter(function (d) { return d.id !== nxt; })[0] || decks[0];
+      loadDeck(free, songs[cur]);
+    }
+    if (nxt && nxt !== cur && !deckFor(nxt) && songs[nxt]) {
+      var idle = decks.filter(function (d) { return d.id !== cur; })[0];
+      if (idle) loadDeck(idle, songs[nxt]);
+    }
+    if (cur && !deckFor(cur) && dc && dc.readyState === 'open' && !(tries[cur] >= MAX_TRIES)) status('Loading song…');
+    syncAudio(false);
+  }
+
+  function pauseAll() { decks.forEach(function (d) { if (!d.el.paused) d.el.pause(); }); }
+
+  // Follow the room clock: correct drift over 400 ms, mirror play/pause.
+  function syncAudio(force) {
+    var d = deckFor(play.track && play.track.id);
+    decks.forEach(function (x) { if (x !== d && !x.el.paused) x.el.pause(); });
+    if (!wantAudio || !d || d.el.readyState < 1) return;
+    var want = positionMs() / 1000;
+    if (isFinite(d.el.duration)) want = Math.min(want, d.el.duration);
+    if (force || Math.abs(d.el.currentTime - want) > 0.4) { try { d.el.currentTime = want; } catch (e) {} }
+    if (play.playing && d.el.paused) {
+      d.el.play().then(function () { blocked = false; }).catch(function () {
+        blocked = true;
+        status('The browser paused autoplay. Tap anywhere to continue.', 'warn');
+      });
+    } else if (!play.playing) {
+      if (!d.el.paused) d.el.pause();
+      status('Paused by the host.');
+    }
+  }
+  setInterval(function () { syncAudio(false); }, 2000);
+
+  // If the browser still refuses an automatic start, any tap resumes it.
+  ['pointerdown', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () { if (blocked && wantAudio) { blocked = false; decks.forEach(unlockDeck); syncAudio(true); } }, { passive: true });
+  });
+
+  renderQueue();
+  drawWave();
+})();
+</script>
+</body>
+</html>

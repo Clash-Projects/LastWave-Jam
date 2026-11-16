@@ -37,6 +37,9 @@ type Client struct {
 	room   *Room
 	closed atomic.Bool
 	send   chan []byte
+	// web marks a browser listen-page guest: it can chat and receive the
+	// host's P2P audio, but is never promoted to host.
+	web bool
 }
 
 // GenerateID returns a cryptographically random hex identifier.
@@ -315,8 +318,26 @@ func (c *Client) dispatch(env protocol.Envelope) {
 				c.SendError("invalid_payload", "Invalid join_room payload")
 				return
 			}
+			c.web = p.ClientKind == "web"
 			_ = c.hub.JoinRoom(c, p.RoomCode, p.Name)
 		}
+
+	case protocol.MsgTypeSetWebGuests:
+		r := c.CurrentRoom()
+		var p protocol.SetWebGuestsPayload
+		if r == nil || json.Unmarshal(env.Payload, &p) != nil {
+			c.SendError("invalid_payload", "Invalid set_web_guests payload")
+			return
+		}
+		r.SetWebGuests(c, p.Enabled)
+
+	case protocol.MsgTypeRTCSignal:
+		r := c.CurrentRoom()
+		var p protocol.RTCSignalPayload
+		if r == nil || json.Unmarshal(env.Payload, &p) != nil || len(p.Data) == 0 {
+			return
+		}
+		r.RelayRTCSignal(c, p.To, p.Data)
 
 	case protocol.MsgTypeLeaveRoom:
 		if r := c.CurrentRoom(); r != nil {

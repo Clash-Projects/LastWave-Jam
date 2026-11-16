@@ -36,6 +36,9 @@ type Room struct {
 	state              protocol.PlaybackState
 	chat               *ChatBuffer
 	pendingSuggestions map[string]*protocol.SuggestionReceivedPayload
+	// webHostID is the main host who allowed browser guests; it stops
+	// counting as soon as someone else becomes main host.
+	webHostID string
 }
 
 // NewRoom creates a new listening room with the specified host and mode.
@@ -157,7 +160,12 @@ func (r *Room) Join(c *Client, rawName string) error {
 
 	r.mu.RLock()
 	full := len(r.participants) >= maxRoomParticipants
+	webOff := c.web && !r.webGuestsLocked()
 	r.mu.RUnlock()
+	if webOff {
+		c.SendError("web_guests_off", "The host hasn't turned on browser listening for this room")
+		return errors.New("web guests not allowed")
+	}
 	if full {
 		c.SendError("room_full", "This room is full, try again in a bit")
 		return errors.New("room full")
@@ -172,7 +180,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 	r.noteSeenLocked(name)
 
 	// Promote as host if room currently has no host (radio stations never have one)
-	if r.host == nil && !r.Radio {
+	if r.host == nil && !r.Radio && !c.web {
 		r.host = c
 	}
 
@@ -187,6 +195,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 			Name:     p.Name(),
 			IsHost:   r.isHostLocked(p),
 			IsCoHost: coHostID != "" && coHostID == p.ID,
+			IsWeb:    p.web,
 			JoinedAt: time.Now().UnixMilli(),
 		})
 	}
@@ -211,6 +220,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 		RoomName:     r.Name,
 		Radio:        r.Radio,
 		StationAuto:  r.Radio && !r.radioManual,
+		WebGuests:    r.webGuestsLocked(),
 		RoomMode:     r.Mode,
 		Playback:     playbackSnapshot,
 		Participants: participants,
@@ -222,6 +232,7 @@ func (r *Room) Join(c *Client, rawName string) error {
 		"user_id":     c.ID,
 		"name":        name,
 		"is_host":     isHost,
+		"is_web":      c.web,
 		"total_users": totalUsers,
 	}, c.ID)
 
@@ -282,12 +293,12 @@ func (r *Room) Leave(c *Client) {
 			newHost = r.coHost
 			r.coHost = nil
 			coHostCleared = true
-		case len(r.joinedOrder) > 0 && r.Permanent:
-			// Always-active rooms: the most recent joiner becomes admin.
-			newHost = r.participants[r.joinedOrder[len(r.joinedOrder)-1]]
-		case len(r.joinedOrder) > 0:
-			// Normal rooms: the longest-tenured member becomes host.
-			newHost = r.participants[r.joinedOrder[0]]
+		case r.Permanent:
+			// Always-active rooms: the most recent app joiner becomes admin.
+			newHost = r.nextAppHostLocked(true)
+		default:
+			// Normal rooms: the longest-tenured app member becomes host.
+			newHost = r.nextAppHostLocked(false)
 		}
 		r.host = newHost
 		// The queue belonged to the previous admin; the new admin republishes.
@@ -300,10 +311,18 @@ func (r *Room) Leave(c *Client) {
 		r.resetLocked()
 	}
 
+	webStopped := r.webHostID != "" && r.webHostID == c.ID
+	if webStopped {
+		r.webHostID = ""
+	}
 	totalUsers := len(r.participants)
 	userName := c.Name()
 	hostID, coHostID := r.hostIDsLocked()
 	r.mu.Unlock()
+
+	if webStopped {
+		r.Broadcast(protocol.MsgTypeWebGuestsChanged, map[string]any{"enabled": false})
+	}
 
 	// Notify room that user left
 	r.Broadcast(protocol.MsgTypeUserLeft, map[string]any{

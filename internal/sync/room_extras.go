@@ -77,7 +77,7 @@ func (r *Room) GrantCoHost(c *Client, targetID string) {
 		return
 	}
 	target, ok := r.participants[targetID]
-	if !ok || targetID == c.ID {
+	if !ok || targetID == c.ID || target.web {
 		r.mu.Unlock()
 		c.SendError("invalid_target", "Pick someone else in the room")
 		return

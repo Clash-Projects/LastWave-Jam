@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Listen to a LastWave Jam room in your browser.">
+<title>LastWave Jam · Listen</title>
+<style>
+  :root { --bg:#000; --card:#111214; --line:#24262b; --text:#f2f3f5; --dim:#9a9ca6; --accent:#7c8cff; --warn:#f5b84d; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+  @media (min-width: 820px) { main { grid-template-columns: 1fr 360px; align-items: start; } .wide { grid-column: 1 / -1; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+  .row { display: flex; gap: 14px; align-items: center; min-width: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .dim { color: var(--dim); font-size: 13px; }
+  .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  h1 { font-size: 18px; margin: 0; }
+  #cover { width: 96px; height: 96px; border-radius: 10px; background: #1b1c20; object-fit: cover; flex: none; }
+  #title { font-size: 20px; font-weight: 700; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: #1b1c20; color: var(--text); border-radius: 10px; padding: 10px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+  button:disabled { opacity: .5; cursor: default; }
+  input { font: inherit; width: 100%; background: #000; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  #status { margin-top: 10px; font-size: 13px; color: var(--dim); }
+  #status.warn { color: var(--warn); } #status.bad { color: var(--bad); }
+  #lyrics { max-height: 320px; overflow-y: auto; }
+  #lyrics p { margin: 6px 0; color: var(--dim); }
+  #lyrics p.on { color: var(--text); font-weight: 700; }
+  #chat { height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .msg b { font-weight: 600; } .msg .host { color: var(--accent); }
+  .banner { font-size: 13px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .banner .links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .banner .btn { padding: 6px 10px; font-size: 13px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section class="card wide banner" aria-label="About browser listening">
+    <span class="grow" style="min-width:220px">Browser listening is capped at 96–128 kbps. Get LastWave for 24-bit lossless, EQ and hosting your own rooms.</span>
+    <span class="links">
+      <a class="btn" href="https://github.com/Clash-Projects/LastWave-Desktop/releases/latest" target="_blank" rel="noopener">Desktop</a>
+      <a class="btn" href="https://github.com/Clash-Projects/LastWave-native/releases/latest" target="_blank" rel="noopener">Android</a>
+      <a class="btn" href="https://discord.gg/TMCEPSUNk2" target="_blank" rel="noopener">Discord</a>
+      <a class="btn" href="https://t.me/clashprojects" target="_blank" rel="noopener">Telegram</a>
+    </span>
+  </section>
+
+  <section id="join" class="card wide">
+    <h1>Join room <span id="code-label"></span></h1>
+    <p class="dim">No app or account needed. Pick a name so others can see you in chat.</p>
+    <form id="join-form" class="row">
+      <input id="name" maxlength="32" placeholder="Your name" autocomplete="nickname" required class="grow">
+      <button class="primary" type="submit">Join</button>
+    </form>
+    <div id="join-status" class="dim" style="margin-top:10px"></div>
+  </section>
+
+  <div id="room" class="hidden" style="display:contents">
+    <section class="card">
+      <div class="row">
+        <img id="cover" alt="">
+        <div class="grow">
+          <div id="title" class="ell">Nothing playing yet</div>
+          <div id="artist" class="dim ell"></div>
+          <div class="dim" style="margin-top:4px"><span id="count">0</span> listening · room <span id="code2"></span></div>
+        </div>
+      </div>
+      <div style="margin-top:14px"><button id="listen" class="primary" type="button">Tap to Listen</button></div>
+      <div id="status" role="status" aria-live="polite"></div>
+      <audio id="audio" autoplay></audio>
+    </section>
+
+    <section class="card" aria-label="Chat">
+      <div id="chat" aria-live="polite"></div>
+      <form id="chat-form" class="row">
+        <input id="chat-input" maxlength="500" placeholder="Say something" autocomplete="off" class="grow">
+        <button type="submit">Send</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="dim" style="margin-bottom:6px">Lyrics</div>
+      <div id="lyrics"><p>No lyrics yet.</p></div>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var code = (params.get('code') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // The page is mirrored on static hosting; signaling always lives on the Jam server.
+  var sameOrigin = /(^|\.)clashgram\.org$|^localhost$|^127\./.test(location.hostname);
+  var WS_URL = sameOrigin ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws' : 'wss://jam.clashgram.org/ws';
+  var ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+
+  var ws = null, me = '', hostId = '', webOn = false, count = 0;
+  var pc = null, wantAudio = false, connectTimer = 0;
+  var play = { track: null, pos: 0, at: 0, playing: false };
+  var clockOffset = 0; // server_ms - local_ms
+  var lyrics = [], lyricIdx = -1, lyricsKey = '';
+
+  $('code-label').textContent = code;
+  $('code2').textContent = code;
+  try { $('name').value = localStorage.getItem('lw_jam_name') || ''; } catch (e) {}
+  if (!code) $('join-status').textContent = 'This link has no room code. Ask the host for the full link.';
+
+  function status(text, cls) { var s = $('status'); s.textContent = text; s.className = cls || ''; }
+  function send(type, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: type, payload: payload })); }
+  function signal(data) { if (hostId) send('rtc_signal', { to: hostId, data: data }); }
+
+  $('join-form').onsubmit = function (e) {
+    e.preventDefault();
+    var name = $('name').value.trim();
+    if (!name || !code) return;
+    try { localStorage.setItem('lw_jam_name', name); } catch (err) {}
+    connect(name);
+  };
+
+  function connect(name) {
+    // A rejected join (e.g. browser listening off) keeps the socket: just retry on it.
+    if (ws && ws.readyState === 1) return send('join_room', { room_code: code, name: name, client_kind: 'web' });
+    if (ws && ws.readyState === 0) return;
+    $('join-status').textContent = 'Connecting…';
+    ws = new WebSocket(WS_URL);
+    ws.onopen = function () {
+      send('join_room', { room_code: code, name: name, client_kind: 'web' });
+      send('ping', Date.now());
+    };
+    ws.onmessage = function (ev) { try { var m = JSON.parse(ev.data); onMessage(m.type, m.payload || {}); } catch (e) {} };
+    ws.onclose = function () {
+      closePeer();
+      if (me) status('Disconnected from the room. Reload to rejoin.', 'bad');
+      else $('join-status').textContent = $('join-status').textContent === 'Connecting…' ? 'Could not reach the Jam server.' : $('join-status').textContent;
+      me = '';
+    };
+  }
+  setInterval(function () { send('ping', Date.now()); }, 25000);
+
+  function onMessage(type, p) {
+    switch (type) {
+      case 'sync_state':
+        me = p.user_id; hostId = p.host_id || ''; webOn = !!p.web_guests;
+        count = (p.participants || []).length;
+        $('join').classList.add('hidden'); $('room').classList.remove('hidden');
+        (p.chat_history || []).forEach(addChat);
+        applyPlayback(p.playback || {}, (p.playback || {}).current_track);
+        renderCount(); refreshListenState();
+        break;
+      case 'pong':
+        if (p.client_time_ms) clockOffset = p.server_time_ms - (p.client_time_ms + Date.now()) / 2;
+        break;
+      case 'user_joined': case 'user_left':
+        if (typeof p.total_users === 'number') { count = p.total_users; renderCount(); }
+        break;
+      case 'host_changed': case 'cohost_changed':
+        var next = p.host_id || p.new_host_id || hostId;
+        if (next !== hostId) { hostId = next; closePeer(); refreshListenState(); }
+        break;
+      case 'web_guests_changed':
+        webOn = !!p.enabled;
+        if (!webOn) closePeer();
+        refreshListenState();
+        break;
+      case 'chat_message': addChat(p); break;
+      case 'sync_playback': applyPlayback(p, p.track); break;
+      case 'rtc_signal': if (p.from === hostId) onSignal(p.data || {}); break;
+      case 'error':
+        if (!me) $('join-status').textContent = p.message || 'Could not join this room.';
+        else if (p.message) status(p.message, 'warn');
+        break;
+    }
+  }
+
+  function renderCount() { $('count').textContent = count; }
+
+  function refreshListenState() {
+    var btn = $('listen');
+    if (!webOn || !hostId) {
+      btn.disabled = true; wantAudio = false;
+      status(hostId ? 'The host has turned off browser listening. Chat still works.' : 'Waiting for a host…', 'warn');
+      return;
+    }
+    btn.disabled = false;
+    if (wantAudio && !pc) startListening();
+    else if (!pc) status('Tap to Listen to hear the host’s stream.');
+  }
+
+  /* ---- playback, metadata, lyrics ---- */
+  function nowServer() { return Date.now() + clockOffset; }
+  function positionMs() { return play.playing ? play.pos + (nowServer() - play.at) : play.pos; }
+
+  function applyPlayback(p, track) {
+    if (track) play.track = track;
+    play.pos = p.position_ms || 0; play.at = p.server_time_ms || nowServer(); play.playing = !!p.is_playing;
+    var t = play.track;
+    $('title').textContent = t ? t.title : 'Nothing playing yet';
+    $('artist').textContent = t ? t.artist : '';
+    var img = $('cover');
+    if (t && t.artwork_url) { if (img.src !== t.artwork_url) img.src = t.artwork_url; img.classList.remove('hidden'); }
+    else img.removeAttribute('src');
+    if (t) loadLyrics(t);
+  }
+
+  function loadLyrics(t) {
+    var key = t.artist + '\u0000' + t.title;
+    if (key === lyricsKey) return;
+    lyricsKey = key; lyrics = []; lyricIdx = -1;
+    $('lyrics').innerHTML = '<p>Looking for lyrics…</p>';
+    var q = 'artist_name=' + encodeURIComponent(t.artist) + '&track_name=' + encodeURIComponent(t.title);
+    if (t.duration_ms) q += '&duration=' + Math.round(t.duration_ms / 1000);
+    fetch('https://lrclib.net/api/get?' + q)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (key !== lyricsKey) return;
+        lyrics = parseLrc(d && d.syncedLyrics);
+        var box = $('lyrics'); box.textContent = '';
+        if (!lyrics.length) {
+          var plain = d && d.plainLyrics;
+          (plain ? plain.split('\n') : ['No synced lyrics for this song.']).forEach(function (l) { var el = document.createElement('p'); el.textContent = l; box.appendChild(el); });
+          return;
+        }
+        lyrics.forEach(function (l) { var el = document.createElement('p'); el.textContent = l.text || '♪'; l.el = el; box.appendChild(el); });
+      })
+      .catch(function () { if (key === lyricsKey) $('lyrics').innerHTML = '<p>Lyrics unavailable.</p>'; });
+  }
+
+  function parseLrc(text) {
+    var out = [];
+    (text || '').split('\n').forEach(function (line) {
+      var m = /^\[(\d+):(\d+(?:\.\d+)?)\](.*)$/.exec(line.trim());
+      if (m) out.push({ t: (parseInt(m[1], 10) * 60 + parseFloat(m[2])) * 1000, text: m[3].trim() });
+    });
+    return out.sort(function (a, b) { return a.t - b.t; });
+  }
+
+  // 4 Hz is plenty for line-level lyrics and keeps CPU near idle.
+  setInterval(function () {
+    if (!lyrics.length) return;
+    var pos = positionMs(), i = -1;
+    while (i + 1 < lyrics.length && lyrics[i + 1].t <= pos) i++;
+    if (i === lyricIdx) return;
+    if (lyricIdx >= 0) lyrics[lyricIdx].el.classList.remove('on');
+    lyricIdx = i;
+    if (i >= 0) {
+      var el = lyrics[i].el, box = $('lyrics');
+      el.classList.add('on');
+      box.scrollTop = el.offsetTop - box.offsetTop - box.clientHeight / 2 + el.clientHeight / 2;
+    }
+  }, 250);
+
+  /* ---- chat ---- */
+  function addChat(m) {
+    var box = $('chat'), row = document.createElement('div'), who = document.createElement('b'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
+    row.className = 'msg';
+    who.textContent = (m.user_name || 'Someone') + ': ';
+    if (m.is_host) who.className = 'host';
+    row.appendChild(who);
+    row.appendChild(document.createTextNode(m.text || ''));
+    box.appendChild(row);
+    while (box.childNodes.length > 150) box.removeChild(box.firstChild);
+    if (stick) box.scrollTop = box.scrollHeight;
+  }
+  $('chat-form').onsubmit = function (e) {
+    e.preventDefault();
+    var input = $('chat-input'), text = input.value.trim();
+    if (text) send('send_chat', { text: text });
+    input.value = '';
+  };
+
+  /* ---- P2P audio (receive-only: no mic, camera or permission prompts) ---- */
+  $('listen').onclick = function () {
+    wantAudio = true;
+    // Unlock playback inside the tap so the stream can start later without a prompt.
+    $('audio').play().catch(function () {});
+    startListening();
+  };
+
+  function startListening() {
+    closePeer();
+    if (!webOn || !hostId) return refreshListenState();
+    if (!window.RTCPeerConnection) return status('This browser can’t play the stream. Try a recent Chrome, Edge, Firefox or Safari.', 'bad');
+    status('Connecting to the host…');
+    $('listen').disabled = true;
+    pc = new RTCPeerConnection({ iceServers: ICE });
+    var mine = pc;
+    pc.ontrack = function (ev) {
+      var a = $('audio');
+      a.srcObject = ev.streams[0] || new MediaStream([ev.track]);
+      a.play().catch(function () { status('Tap to Listen again to start audio.', 'warn'); $('listen').disabled = false; });
+    };
+    pc.onconnectionstatechange = function () {
+      if (pc !== mine) return;
+      var s = pc.connectionState;
+      if (s === 'connected') { clearTimeout(connectTimer); status('Listening live from the host · up to 128 kbps'); $('listen').disabled = true; }
+      else if (s === 'disconnected') status('Connection unstable, trying to recover…', 'warn');
+      else if (s === 'failed') failDirect();
+    };
+    // Direct P2P only: if it can't connect, say so instead of waiting forever.
+    connectTimer = setTimeout(function () { if (pc === mine && pc.connectionState !== 'connected') failDirect(); }, 20000);
+    signal({ kind: 'hello' });
+  }
+
+  function failDirect() {
+    closePeer();
+    status('Your network blocks a direct connection to the host, so audio can’t play here. Chat and lyrics still work. Try another network (e.g. mobile data) and tap again.', 'bad');
+    $('listen').disabled = !webOn;
+  }
+
+  function closePeer() {
+    clearTimeout(connectTimer);
+    if (pc) { try { pc.close(); } catch (e) {} pc = null; }
+    $('audio').srcObject = null;
+    $('listen').disabled = !webOn || !hostId;
+  }
+
+  function onSignal(d) {
+    if (d.kind === 'offer' && pc) {
+      var mine = pc;
+      pc.setRemoteDescription({ type: 'offer', sdp: d.sdp })
+        .then(function () { return mine.createAnswer(); })
+        .then(function (ans) { return mine.setLocalDescription({ type: 'answer', sdp: stereoOpus(ans.sdp) }); })
+        .then(function () { return iceDone(mine); })
+        .then(function () { if (pc === mine) signal({ kind: 'answer', sdp: mine.localDescription.sdp }); })
+        .catch(function () { if (pc === mine) failDirect(); });
+    } else if (d.kind === 'bye') {
+      closePeer();
+      status(d.reason === 'busy' ? 'The host’s stream is full right now. Try again in a bit.' : 'The host stopped the stream.', 'warn');
+    }
+  }
+
+  // Ask for stereo Opus at the 128 kbps cap the host encodes at.
+  function stereoOpus(sdp) {
+    var m = /a=rtpmap:(\d+) opus\/48000\/2/i.exec(sdp);
+    if (!m) return sdp;
+    return sdp.replace(new RegExp('a=fmtp:' + m[1] + ' ([^\\r\\n]*)'), function (line, params) {
+      return /stereo=1/.test(params) ? line : line + ';stereo=1;maxaveragebitrate=128000';
+    });
+  }
+
+  // Non-trickle ICE: one answer message per guest keeps signaling tiny.
+  function iceDone(conn) {
+    return new Promise(function (resolve) {
+      if (conn.iceGatheringState === 'complete') return resolve();
+      var t = setTimeout(resolve, 3000);
+      conn.addEventListener('icegatheringstatechange', function () { if (conn.iceGatheringState === 'complete') { clearTimeout(t); resolve(); } });
+    });
+  }
+})();
+</script>
+</body>
+</html>

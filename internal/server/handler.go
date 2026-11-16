@@ -46,6 +46,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /og/{file}", h.handleOG)
 	h.registerAdminRoutes(mux)
 
+	if logoPNG, err := embeddedWebFS.ReadFile("web/logo.png"); err == nil {
+		mux.HandleFunc("GET /logo.png", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/png")
+			w.Header().Set("Cache-Control", "public, max-age=604800")
+			_, _ = w.Write(logoPNG)
+		})
+	}
+
 	// One invite link for everyone: /?code=ROOM opens the browser listen page
 	// (with an "Open in app" button). The always-on stations and the bare
 	// landing page keep the app-only page. /listen stays for old links.

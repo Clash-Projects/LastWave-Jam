@@ -514,8 +514,9 @@
     wantAudio = true;
     tries = {}; // a manual tap retries songs that gave up
     $('listen').textContent = 'Listening';
-    // Unlock both decks inside the tap so later songs start without a prompt.
-    decks.forEach(function (d) { if (!d.id) d.el.play().catch(function () {}); });
+    // Unlock both decks inside the tap: iOS Safari only lets an element play
+    // later if it was started by a tap, so the second deck needs it too.
+    decks.forEach(unlockDeck);
     if (!dc || dc.readyState !== 'open') startListening(); else refreshDecks();
     syncAudio(true);
   };
@@ -680,6 +681,16 @@
     audio.addEventListener('playing', function () { if (play.track && d.id === play.track.id) status('Listening live · synced with the room · ~128 kbps'); });
     return d;
   }
+  // 0.1 s of silence: playing it inside the tap marks the element as allowed.
+  var SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+  function unlockDeck(d) {
+    if (d.id || d.unlocked) return;
+    d.unlocked = true;
+    d.el.src = SILENCE;
+    d.el.play().then(function () {
+      if (!d.id && d.el.src === SILENCE) { d.el.pause(); d.el.removeAttribute('src'); d.el.load(); }
+    }).catch(function () { d.unlocked = false; });
+  }
   function deckFor(id) { return id ? decks.filter(function (d) { return d.id === id; })[0] : null; }
   function resetDeck(d) {
     d.el.pause(); d.el.removeAttribute('src'); d.el.load();
@@ -751,13 +762,22 @@
     if (isFinite(d.el.duration)) want = Math.min(want, d.el.duration);
     if (force || Math.abs(d.el.currentTime - want) > 0.4) { try { d.el.currentTime = want; } catch (e) {} }
     if (play.playing && d.el.paused) {
-      d.el.play().catch(function () { status('Tap to Listen again to start audio.', 'warn'); $('listen').textContent = 'Tap to Listen'; });
+      d.el.play().then(function () { blocked = false; }).catch(function () {
+        blocked = true;
+        status('The browser blocked autoplay. Tap anywhere to continue.', 'warn');
+      });
     } else if (!play.playing) {
       if (!d.el.paused) d.el.pause();
       status('Paused by the room.');
     }
   }
   setInterval(function () { syncAudio(false); }, 2000);
+
+  // If the browser still refuses an automatic start, any tap resumes it.
+  var blocked = false;
+  ['pointerdown', 'keydown'].forEach(function (ev) {
+    document.addEventListener(ev, function () { if (blocked && wantAudio) { blocked = false; decks.forEach(unlockDeck); syncAudio(true); } }, { passive: true });
+  });
 
   renderQueue();
 })();
